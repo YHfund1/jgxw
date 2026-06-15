@@ -100,8 +100,9 @@
       text-align: left !important; border-bottom: 2px solid #1890ff;
     }
     .section-row td.sec-inst {
-      background: #f8f9fa !important; font-weight: 600; font-size: 12px;
-      color: #555; border-bottom: 2px solid #1890ff;
+      background: #f8f9fa !important; font-weight: 600;
+      color: #333; padding: 10px 8px !important; text-align: center !important;
+      border-bottom: 2px solid #1890ff;
     }
     .summary-row td { font-weight: 600; }
     .v-pos { color: #389e0d; font-weight: 500; }
@@ -477,9 +478,7 @@ function renderTable(table) {
     }
   }
 
-  let html = '<thead><tr><th style="min-width:70px;"></th>';
-  inst2Headers.forEach(h => html += `<th>${h}</th>`);
-  html += '</tr></thead><tbody>';
+  let html = '<tbody>';
 
   for(const sec of sections) {
     html += `<tr class="section-row"><td class="sec-title">${sec.title}</td>`;
