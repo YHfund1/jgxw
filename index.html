@@ -94,6 +94,15 @@
       font-weight: 700; color: #1890ff; font-size: 14px; padding: 10px 14px !important;
       text-align: left !important;
     }
+    .inst-header-row td {
+      background: #f8f9fa !important; font-weight: 600; font-size: 12px;
+      color: #555; padding: 6px 8px !important; text-align: center !important;
+      border-bottom: 2px solid #1890ff;
+    }
+    .inst-header-row td.inst-label {
+      text-align: left !important; font-weight: 700; color: #1890ff; padding-left: 14px !important;
+    }
+    .inst-header-row:hover td { background: #f0f5ff !important; }
     .summary-row td { font-weight: 600; }
     .v-pos { color: #389e0d; font-weight: 500; }
     .v-neg { color: #cf1322; font-weight: 500; }
@@ -468,14 +477,15 @@ function renderTable(table) {
     }
   }
 
-  let html = '<thead>';
-  html += '<tr><th rowspan="2" style="min-width:70px;"></th><th colspan="8" class="main-header">机构分类</th></tr>';
-  html += '<tr>';
+  let html = '<thead><tr><th style="min-width:70px;"></th>';
   inst2Headers.forEach(h => html += `<th>${h}</th>`);
   html += '</tr></thead><tbody>';
 
   for(const sec of sections) {
     html += `<tr class="section-row"><td colspan="9">${sec.title}</td></tr>`;
+    html += '<tr class="inst-header-row"><td class="inst-label">机构分类</td>';
+    inst2Headers.forEach(h => html += `<td>${h}</td>`);
+    html += '</tr>';
     for(let i=0; i<sec.rows.length; i++) {
       const row = table[sec.rows[i]];
       if(!row) continue;
@@ -493,6 +503,9 @@ function renderTable(table) {
 
   // Summary section
   html += '<tr class="section-row"><td colspan="9">汇总</td></tr>';
+  html += '<tr class="inst-header-row"><td class="inst-label">机构分类</td>';
+  inst2Headers.forEach(h => html += `<td>${h}</td>`);
+  html += '</tr>';
   if (table.summaryData) {
     for (const sd of table.summaryData) {
       html += '<tr class="summary-row">';
