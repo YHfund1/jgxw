@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>机构行为跟踪</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+    }
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      padding: 24px 40px;
+      text-align: center;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .header h1 { color: #fff; font-size: 26px; font-weight: 600; letter-spacing: 3px; }
+    .header .subtitle { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 8px; }
+    .nav-tabs {
+      display: flex; justify-content: center; gap: 12px;
+      padding: 16px 40px; background: #fff; border-bottom: 1px solid #e8e8e8;
+      position: sticky; top: 80px; z-index: 99;
+    }
+    .nav-tab {
+      padding: 10px 32px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 500; transition: all 0.2s;
+      border: 1px solid #d9d9d9; background: #fff; color: #666;
+    }
+    .nav-tab:hover { border-color: #1890ff; color: #1890ff; }
+    .nav-tab.active { background: linear-gradient(135deg, #1890ff, #096dd9); color: #fff; border-color: transparent; }
+    .content { max-width: 1440px; margin: 0 auto; padding: 24px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* Summary bar */
+    .date-range-bar {
+      background: #fff; border-radius: 12px; padding: 14px 24px; margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .date-label { font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; }
+    .date-input {
+      padding: 6px 12px; border-radius: 6px; border: 1px solid #d9d9d9;
+      font-size: 13px; color: #333; outline: none;
+    }
+    .date-input:focus { border-color: #1890ff; }
+    .date-apply-btn {
+      padding: 6px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; border: none;
+      background: linear-gradient(135deg, #1890ff, #096dd9);
+      color: #fff; transition: opacity 0.2s;
+    }
+    .date-apply-btn:hover { opacity: 0.85; }
+    .date-hint { font-size: 12px; color: #999; margin-left: 8px; }
+    .summary-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .summary-item {
+      background: #fff; border-radius: 12px; padding: 20px 28px; flex: 1; min-width: 220px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .summary-item .label { font-size: 13px; color: #888; margin-bottom: 8px; }
+    .summary-item .value { font-size: 28px; font-weight: 700; }
+    .summary-item .value.positive { color: #52c41a; }
+    .summary-item .value.negative { color: #ff4d4f; }
+
+    /* Table */
+    .table-card {
+      background: #fff; border-radius: 12px; padding: 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .table-card h2 {
+      font-size: 18px; color: #1a1a2e; margin-bottom: 20px;
+      padding-bottom: 12px; border-bottom: 3px solid #1890ff; display: inline-block;
+    }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      background: #f8f9fa; padding: 10px 8px; text-align: center;
+      font-weight: 600; border: 1px solid #e8e8e8; color: #333; white-space: nowrap;
+    }
+    .data-table th.main-header { background: #1890ff; color: #fff; font-size: 14px; }
+    .data-table td {
+      padding: 8px; text-align: center; border: 1px solid #f0f0f0; white-space: nowrap; position: relative;
+    }
+    .data-table tr:hover td { background: #f5f9ff; }
+    .cat-cell { text-align: left !important; font-weight: 600; background: #fafbfc !important; padding-left: 14px !important; color: #333; }
+    .sub-cell { text-align: left !important; padding-left: 14px !important; color: #555; }
+    .section-row td {
+      background: linear-gradient(135deg, #e6f7ff, #f0f5ff) !important;
+      font-weight: 700; color: #1890ff; font-size: 14px; padding: 10px 14px !important;
+      text-align: left !important;
+    }
+    .summary-row td { font-weight: 600; }
+    .v-pos { color: #389e0d; font-weight: 500; }
+    .v-neg { color: #cf1322; font-weight: 500; }
+    .v-zero { color: #bbb; }
+
+    /* Charts filter panel */
+    .filter-panel {
+      background: #fff; border-radius: 12px; padding: 18px 24px; margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .filter-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .filter-row + .filter-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f0; }
+    .filter-row .selector-label {
+      font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; min-width: 80px;
+    }
+    .filter-btn {
+      padding: 7px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: all 0.2s;
+      border: 1px solid #d9d9d9; background: #fff; color: #666;
+      position: relative;
+    }
+    .filter-btn:hover { border-color: #1890ff; color: #1890ff; }
+    .filter-btn.active {
+      background: linear-gradient(135deg, #1890ff, #096dd9);
+      color: #fff; border-color: transparent;
+    }
+    .filter-btn.all-btn { font-weight: 600; border-style: dashed; }
+    .filter-btn.all-btn.active { border-style: solid; background: linear-gradient(135deg, #52c41a, #389e0d); }
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .chart-card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .chart-card h3 {
+      font-size: 15px; color: #333; margin-bottom: 12px;
+      padding-left: 10px; border-left: 4px solid #1890ff;
+    }
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .chart-header h3 { margin-bottom: 0; }
+    .chart-header h2 { margin-bottom: 0; }
+    .download-btn {
+      font-size: 12px; color: #999; cursor: pointer; white-space: nowrap;
+      padding: 4px; border-radius: 6px; display: inline-flex; align-items: center;
+      transition: all 0.2s; text-decoration: none;
+    }
+    .download-btn:hover { color: #1890ff; background: #e6f7ff; }
+    .chart-container { width: 100%; height: 380px; }
+    .mma-toggle {
+      display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .mma-toggle label { font-size: 13px; font-weight: 600; color: #333; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .mma-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1890ff; cursor: pointer; }
+    .mma-toggle .mma-hint { font-size: 11px; color: #999; }
+    @media (max-width: 900px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .content { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>机构行为跟踪</h1>
+    <div class="subtitle">数据来源：CFETS</div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-tab="table" onclick="switchTab('table', this)">分期限统计表</div>
+    <div class="nav-tab" data-tab="charts" onclick="switchTab('charts', this)">机构净买入（季节性）</div>
+    <div class="nav-tab" data-tab="cumcharts" onclick="switchTab('cumcharts', this)">机构累计净买入（季节性）</div>
+    <div class="nav-tab" data-tab="timeseries" onclick="switchTab('timeseries', this)">时间序列</div>
+  </div>
+  <div class="content">
+    <div id="section-table" class="section active">
+      <div class="date-range-bar">
+        <span class="date-label">起始时间：</span>
+        <input type="date" id="startDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;">结束时间：</span>
+        <input type="date" id="endDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyDateRange()">应用</button>
+        <span class="date-hint" id="dateHint"></span>
+      </div>
+      <div class="table-card">
+        <div class="chart-header">
+          <h2>分期限统计表（净买入，亿元）</h2>
+          <a class="download-btn" title="下载图表" onclick="downloadTableImage()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div style="overflow-x:auto;"><table class="data-table" id="dataTable"></table></div>
+      </div>
+      <div class="date-range-bar" style="margin-top:16px;">
+        <span class="date-label" style="color:#fa8c16;">上期起始时间：</span>
+        <input type="date" id="prevStartDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;color:#fa8c16;">上期结束时间：</span>
+        <input type="date" id="prevEndDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyDateRange()" style="background:linear-gradient(135deg,#fa8c16,#d46b08);">应用</button>
+        <span class="date-hint" id="prevDateHint"></span>
+      </div>
+    </div>
+    <div id="section-timeseries" class="section">
+      <div class="filter-panel">
+        <div class="date-range-bar" style="box-shadow:none;border:none;padding:0;margin-bottom:12px;">
+          <span class="date-label">起始时间：</span>
+          <input type="date" id="tsStartDate" class="date-input">
+          <span class="date-label" style="margin-left:16px;">结束时间：</span>
+          <input type="date" id="tsEndDate" class="date-input">
+        </div>
+        <div class="filter-row" id="tsBondSelector"></div>
+        <div class="filter-row" id="tsTermSelector"></div>
+        <div style="margin-top:12px;">
+          <span class="date-hint" id="tsHint"></span>
+        </div>
+      </div>
+      <div id="tsChartsArea" style="margin-top:20px;"></div>
+    </div>
+    <div id="section-charts" class="section">
+      <div class="filter-panel" id="filterPanel">
+        <div class="filter-row" id="bondSelector"></div>
+        <div class="filter-row" id="instSelector"></div>
+        <div class="filter-row" id="periodSelector"></div>
+        <div style="margin-top:10px;font-size:12px;color:#999;" id="chartCount"></div>
+        <div class="mma-toggle">
+          <label><input type="checkbox" id="mmaToggle" onchange="toggle10MMA()" checked> 显示10日移动平均线（10DMA）</label>
+          <span class="mma-hint">只显示平滑曲线，隐藏原始数据</span>
+        </div>
+      </div>
+      <div class="charts-grid" id="chartsGrid"></div>
+    </div>
+    <div id="section-cumcharts" class="section">
+      <div class="filter-panel" id="cumFilterPanel">
+        <div class="filter-row" id="cumBondSelector"></div>
+        <div class="filter-row" id="cumInstSelector"></div>
+        <div class="filter-row" id="cumTermSelector"></div>
+        <div style="margin-top:10px;font-size:12px;color:#999;" id="cumChartCount"></div>
+      </div>
+      <div class="charts-grid" id="cumChartsGrid"></div>
+    </div>
+  </div>
+
+<script>
+let appData = null;
+let chartInstances = [];
+let selectedBondTypes = [];
+let selectedPeriods = ['超长'];
+let selectedInstitutions = [];
+let show10MMA = true;
+
+// Chart data stores for download functionality (keyed lookup maps)
+const _seasonalChartData = new Map();
+const _cumChartData = new Map();
+const _tsChartData = new Map();
+
+fetch('data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
+  appData = data;
+  computeLiLvZhai(data);
+  selectedBondTypes = [data.bond_types[0]]; // default: 国债
+  selectedInstitutions = data.institutions.slice(); // all selected
+  
+  // Set up date pickers with default range
+  document.getElementById('startDate').value = data.default_start;
+  document.getElementById('endDate').value = data.default_end;
+  document.getElementById('startDate').min = data.all_dates[0];
+  document.getElementById('startDate').max = data.all_dates[data.all_dates.length - 1];
+  document.getElementById('endDate').min = data.all_dates[0];
+  document.getElementById('endDate').max = data.all_dates[data.all_dates.length - 1];
+  
+  // Set up prev period date pickers
+  document.getElementById('prevStartDate').value = data.default_start;
+  document.getElementById('prevEndDate').value = data.default_end;
+  document.getElementById('prevStartDate').min = data.all_dates[0];
+  document.getElementById('prevStartDate').max = data.all_dates[data.all_dates.length - 1];
+  document.getElementById('prevEndDate').min = data.all_dates[0];
+  document.getElementById('prevEndDate').max = data.all_dates[data.all_dates.length - 1];
+  
+  // Compute and render table with default date range
+  const computedTable = computeTable(data, data.default_start, data.default_end, data.default_start, data.default_end);
+  renderTable(computedTable);
+  
+  renderFilterPanel(data);
+  renderCharts(data);
+  initCumChartsPanel(data);
+  renderCumCharts(data);
+  initTimeSeriesPanel(data);
+  renderTimeSeries();
+}).catch(err=>{
+  document.querySelector('.content').innerHTML = '<div style="text-align:center;padding:80px;color:#999;font-size:16px;">数据加载失败，请确保 data.json 文件存在<br><small>'+err.message+'</small></div>';
+});
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('section-'+tab).classList.add('active');
+  if(tab==='charts') setTimeout(()=>chartInstances.forEach(c=>c.resize()),150);
+  if(tab==='cumcharts') setTimeout(()=>cumChartInstances.forEach(c=>c.resize()),150);
+  if(tab==='timeseries') setTimeout(()=>{ if(tsChartInstances.length) tsChartInstances.forEach(c=>c.resize()); },150);
+}
+
+// === Dynamic table computation (SUMIFS equivalent) ===
+// Table structure: 5 sections × (1 header + 6 term rows) + 2 summary rows = 42 rows
+// Sections: 国债(rows 0-6), 政金债(8-14), 地方债(16-22), 信用债(24-30), 二永债(32-38)
+// Data rows within each section: indices 1,2,3,4,5,6 → terms 1Y以下..超长
+const sectionDefs = [
+  { name: '国债', dataRows: [1,2,3,4,5,6] },
+  { name: '政金债', dataRows: [1,2,3,4,5,6] },
+  { name: '地方债', dataRows: [1,2,3,4,5,6] },
+  { name: '信用债', dataRows: [1,2,3,4,5,6] },
+  { name: '二永债', dataRows: [1,2,3,4,5,6] },
+];
+const tableTerms = ['1Y以下', '1-3Y', '3-5Y', '5-7Y', '7-10Y', '超长'];
+
+function sumRange(rawBondData, termName, startDate, endDate) {
+  // rawBondData = {dates: [...], terms: {termName: [[v0..v7], ...]}}
+  const dates = rawBondData.dates;
+  const values = rawBondData.terms[termName];
+  if (!values) return [0,0,0,0,0,0,0,0];
+  const sum = [0,0,0,0,0,0,0,0];
+  for (let i = 0; i < dates.length; i++) {
+    if (dates[i] >= startDate && dates[i] <= endDate) {
+      const row = values[i];
+      for (let j = 0; j < 8; j++) sum[j] += (row[j] || 0);
+    }
+  }
+  return sum.map(v => Math.round(v * 100) / 100);
+}
+
+function computeTable(data, startDate, endDate, prevStartDate, prevEndDate) {
+  const table = [];
+  const rawTable = data.raw_table;
+  const bondTypes = data.table_bond_types; // ['国债','政金债','地方债','信用债','二永债']
+  
+  const grandTotalCur = [0,0,0,0,0,0,0,0];
+  
+  const sectionStartRows = [0, 8, 16, 24, 32];
+  
+  // Build 42 empty rows
+  for (let i = 0; i < 42; i++) table.push(new Array(10).fill(null));
+  
+  for (let s = 0; s < 5; s++) {
+    const bondName = bondTypes[s];
+    const rawBond = rawTable[bondName];
+    if (!rawBond) continue;
+    
+    const baseRow = sectionStartRows[s];
+    
+    for (let t = 0; t < 6; t++) {
+      const termName = tableTerms[t];
+      const curSum = sumRange(rawBond, termName, startDate, endDate);
+      
+      const dataRow = table[baseRow + 1 + t];
+      dataRow[0] = null;
+      dataRow[1] = termName;
+      for (let j = 0; j < 8; j++) {
+        dataRow[2 + j] = curSum[j];
+        grandTotalCur[j] += curSum[j];
+      }
+    }
+  }
+  
+  // Summary rows
+  const curValues = grandTotalCur.map(v => Math.round(v * 100) / 100);
+  const prevValues = computePrevSummary(data, prevStartDate, prevEndDate);
+  
+  table.summaryData = [
+    { label: '本期净买入（' + startDate.replace(/-/g,'/') + '-' + endDate.replace(/-/g,'/') + '）', values: curValues },
+    { label: '上期净买入（' + prevStartDate.replace(/-/g,'/') + '-' + prevEndDate.replace(/-/g,'/') + '）', values: prevValues }
+  ];
+  
+  return table;
+}
+
+function computePrevSummary(data, prevStart, prevEnd) {
+  const rawTable = data.raw_table;
+  const bondTypes = data.table_bond_types;
+  const total = [0,0,0,0,0,0,0,0];
+  for (const bondName of bondTypes) {
+    const rawBond = rawTable[bondName];
+    if (!rawBond) continue;
+    for (const termName of tableTerms) {
+      const s = sumRange(rawBond, termName, prevStart, prevEnd);
+      for (let j = 0; j < 8; j++) total[j] += s[j];
+    }
+  }
+  return total.map(v => Math.round(v * 100) / 100);
+}
+
+function applyDateRange() {
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  if (!startDate || !endDate) return;
+  if (startDate > endDate) {
+    document.getElementById('dateHint').textContent = '⚠ 起始时间不能晚于结束时间';
+    return;
+  }
+  document.getElementById('dateHint').textContent = '';
+  document.getElementById('prevDateHint').textContent = '';
+  const prevStart = document.getElementById('prevStartDate').value;
+  const prevEnd = document.getElementById('prevEndDate').value;
+  if (prevStart > prevEnd) {
+    document.getElementById('prevDateHint').textContent = '⚠ 上期起始时间不能晚于结束时间';
+    return;
+  }
+  const computedTable = computeTable(appData, startDate, endDate, prevStart, prevEnd);
+  renderTable(computedTable);
+}
+
+function fmtText(v) {
+  if(v===null||v===undefined) return '-';
+  const n = typeof v==='number' ? v : parseFloat(v);
+  if(isNaN(n)) return String(v);
+  const r = Math.round(n);
+  if(r===0) return '0';
+  return (r>0?'+':'')+r;
+}
+
+function summaryBg(val, maxAbs) {
+  if (val === null || val === undefined || maxAbs === 0) return '';
+  const n = typeof val === 'number' ? val : parseFloat(val);
+  if (isNaN(n) || n === 0) return '';
+  const ratio = Math.min(Math.abs(n) / maxAbs, 1);
+  const t = Math.pow(ratio, 0.55);
+  if (n > 0) {
+    const r = 255, g = Math.round(245 - t * 195), b = Math.round(245 - t * 210);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const r = Math.round(245 - t * 210), g = Math.round(245 - t * 135), b = Math.round(250 - t * 180);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function fmtVal(v) {
+  if(v===null||v===undefined) return {text:'-', cls:'v-zero'};
+  const n = typeof v==='number' ? v : parseFloat(v);
+  if(isNaN(n)) return {text:String(v), cls:''};
+  if(n===0) return {text:'0.00', cls:'v-zero'};
+  return {text:(n>0?'+':'')+n.toFixed(2), cls:n>0?'v-pos':'v-neg'};
+}
+
+function renderTable(table) {
+  // Data structure: each row has [colB, colC, val1..val8]
+  // colB = category (国债/政金债/etc) or sub-term
+  // colC = sub-term or institution header
+  
+  // Section definitions: [title, startRow(0-idx), dataRowCounts]
+  const sections = [
+    { title:'国债', rows:[1,2,3,4,5,6], headerType:'inst1' },
+    { title:'政金债', rows:[9,10,11,12,13,14], headerType:'inst2' },
+    { title:'地方债', rows:[17,18,19,20,21,22], headerType:'inst2' },
+    { title:'信用债', rows:[25,26,27,28,29,30], headerType:'inst2' },
+    { title:'其他（二永为主）', rows:[33,34,35,36,37,38], headerType:'inst2' },
+  ];
+  const terms = ['1Y以下','1-3Y','3-5Y','5-7Y','7-10Y','超长'];
+  const inst1Headers = ['大型银行','中小型银行','证券公司','保险公司','基金公司及产品','理财类产品','货币基金','其他'];
+  const inst2Headers = ['大型银行','中小型银行','证券公司','保险公司','基金公司及产品','理财类产品','货币基金','其他'];
+
+  // Compute max absolute value for gradient coloring
+  let maxAbs = 0;
+  for(const sec of sections) {
+    for(const rowIdx of sec.rows) {
+      const row = table[rowIdx];
+      if(!row) continue;
+      for(let j=2; j<row.length && j<10; j++) {
+        if(row[j]!==null && typeof row[j]==='number') maxAbs = Math.max(maxAbs, Math.abs(row[j]));
+      }
+    }
+  }
+  if (table.summaryData) {
+    for (const sd of table.summaryData) {
+      for (let j = 0; j < 8; j++) {
+        if(sd.values[j]!==null && typeof sd.values[j]==='number') maxAbs = Math.max(maxAbs, Math.abs(sd.values[j]));
+      }
+    }
+  }
+
+  let html = '<thead>';
+  html += '<tr><th rowspan="2" style="min-width:70px;"></th><th colspan="8" class="main-header">机构分类</th></tr>';
+  html += '<tr>';
+  inst2Headers.forEach(h => html += `<th>${h}</th>`);
+  html += '</tr></thead><tbody>';
+
+  for(const sec of sections) {
+    html += `<tr class="section-row"><td colspan="9">${sec.title}</td></tr>`;
+    for(let i=0; i<sec.rows.length; i++) {
+      const row = table[sec.rows[i]];
+      if(!row) continue;
+      html += '<tr>';
+      html += `<td class="sub-cell">${terms[i]}</td>`;
+      for(let j=2; j<row.length && j<10; j++) {
+        const text = fmtText(row[j]);
+        const bg = summaryBg(row[j], maxAbs);
+        const style = bg ? `background:${bg};color:#000;` : 'color:#000;';
+        html += `<td style="${style}">${text}</td>`;
+      }
+      html += '</tr>';
+    }
+  }
+
+  // Summary section
+  html += '<tr class="section-row"><td colspan="9">汇总</td></tr>';
+  if (table.summaryData) {
+    for (const sd of table.summaryData) {
+      html += '<tr class="summary-row">';
+      html += `<td class="cat-cell">${sd.label}</td>`;
+      for (let j = 0; j < 8; j++) {
+        const text = fmtText(sd.values[j]);
+        const bg = summaryBg(sd.values[j], maxAbs);
+        const style = bg ? `background:${bg};color:#000;` : 'color:#000;';
+        html += `<td style="${style}">${text}</td>`;
+      }
+      html += '</tr>';
+    }
+  }
+  html += '</tbody>';
+  document.getElementById('dataTable').innerHTML = html;
+}
+
+const yearColors = {'2022':'#adb5bd','2023':'#74b9ff','2024':'#2196F3','2025':'#1565C0','2026':'#e74c3c'};
+const yearWidths = {'2022':1.2,'2023':1.5,'2024':1.8,'2025':2,'2026':2.5};
+
+function renderFilterPanel(data) {
+  // Bond type selector
+  const bondSel = document.getElementById('bondSelector');
+  bondSel.innerHTML = '<span class="selector-label">债券类型：</span>';
+  const allBondBtn = document.createElement('button');
+  allBondBtn.className = 'filter-btn all-btn';
+  allBondBtn.textContent = '全选';
+  allBondBtn.onclick = () => toggleAll('bond');
+  bondSel.appendChild(allBondBtn);
+  data.bond_types.forEach(bt => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (selectedBondTypes.includes(bt) ? ' active' : '');
+    btn.textContent = bt;
+    btn.dataset.value = bt;
+    btn.onclick = () => toggleFilter('bond', bt);
+    bondSel.appendChild(btn);
+  });
+
+  // Institution selector
+  const instSel = document.getElementById('instSelector');
+  instSel.innerHTML = '<span class="selector-label">机构类型：</span>';
+  const allInstBtn = document.createElement('button');
+  allInstBtn.className = 'filter-btn all-btn active';
+  allInstBtn.textContent = '全选';
+  allInstBtn.onclick = () => toggleAll('inst');
+  instSel.appendChild(allInstBtn);
+  data.institutions.forEach(inst => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn active';
+    btn.textContent = inst;
+    btn.dataset.value = inst;
+    if (inst === '其他') btn.title = '其他主要包括：券商资管、年金、养老金、社保、保险资管、财务公司、信托等';
+    btn.onclick = () => toggleFilter('inst', inst);
+    instSel.appendChild(btn);
+  });
+
+  // Period selector (renamed to 剩余期限)
+  const posSel = document.getElementById('periodSelector');
+  posSel.innerHTML = '<span class="selector-label">剩余期限：</span>';
+  const allPosBtn = document.createElement('button');
+  allPosBtn.className = 'filter-btn all-btn';
+  allPosBtn.textContent = '全选';
+  allPosBtn.onclick = () => toggleAll('period');
+  posSel.appendChild(allPosBtn);
+  data.positions.forEach(pos => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (selectedPeriods.includes(pos) ? ' active' : '');
+    btn.textContent = pos === '总' ? '总计' : pos;
+    btn.dataset.value = pos;
+    btn.onclick = () => toggleFilter('period', pos);
+    posSel.appendChild(btn);
+  });
+}
+
+function toggleFilter(type, value) {
+  let arr, allItems;
+  if (type === 'bond') { arr = selectedBondTypes; allItems = appData.bond_types; }
+  else if (type === 'inst') { arr = selectedInstitutions; allItems = appData.institutions; }
+  else { arr = selectedPeriods; allItems = appData.positions; }
+
+  const idx = arr.indexOf(value);
+  if (idx >= 0) {
+    if (arr.length <= 1) return; // keep at least one
+    arr.splice(idx, 1);
+  } else {
+    arr.push(value);
+  }
+  updateFilterUI();
+  renderCharts(appData);
+}
+
+function toggleAll(type) {
+  let arr, allItems, setter;
+  if (type === 'bond') { arr = selectedBondTypes; allItems = appData.bond_types; setter = v => selectedBondTypes = v; }
+  else if (type === 'inst') { arr = selectedInstitutions; allItems = appData.institutions; setter = v => selectedInstitutions = v; }
+  else { arr = selectedPeriods; allItems = appData.positions; setter = v => selectedPeriods = v; }
+
+  const allSelected = arr.length === allItems.length;
+  if (allSelected) {
+    setter([allItems[0]]); // keep first one
+  } else {
+    setter(allItems.slice());
+  }
+  updateFilterUI();
+  renderCharts(appData);
+}
+
+function updateFilterUI() {
+  // Update bond type buttons
+  const bondSel = document.getElementById('bondSelector');
+  bondSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(btn => {
+    btn.classList.toggle('active', selectedBondTypes.includes(btn.dataset.value));
+  });
+  bondSel.querySelector('.all-btn').classList.toggle('active', selectedBondTypes.length === appData.bond_types.length);
+
+  // Update institution buttons
+  const instSel = document.getElementById('instSelector');
+  instSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(btn => {
+    btn.classList.toggle('active', selectedInstitutions.includes(btn.dataset.value));
+  });
+  instSel.querySelector('.all-btn').classList.toggle('active', selectedInstitutions.length === appData.institutions.length);
+
+  // Update period buttons
+  const posSel = document.getElementById('periodSelector');
+  posSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(btn => {
+    btn.classList.toggle('active', selectedPeriods.includes(btn.dataset.value));
+  });
+  posSel.querySelector('.all-btn').classList.toggle('active', selectedPeriods.length === appData.positions.length);
+}
+
+function computeLiLvZhai(data) {
+  const sources = ['国债', '政金债', '地方债'];
+  // 1. 季节性图表: charts_by_bond
+  const bondCharts = {};
+  const positions = data.positions;
+  for (const pos of positions) {
+    const chartsForPos = [];
+    const refCharts = [];
+    for (const src of sources) {
+      const c = data.charts_by_bond[src] && data.charts_by_bond[src][pos];
+      if (c) refCharts.push(c);
+    }
+    if (refCharts.length === 0) continue;
+    for (let ci = 0; ci < refCharts[0].length; ci++) {
+      const ref = refCharts[0][ci];
+      const chart = {
+        title: ref.title, institution: ref.institution,
+        period: ref.period, bond_type: '利率债',
+        series: ref.series.map((s, si) => {
+          const combined = s.data.map((val, di) => {
+            let hasData = false, sum = 0;
+            if (val != null) { hasData = true; sum += val; }
+            for (let k = 1; k < refCharts.length; k++) {
+              const other = refCharts[k][ci].series[si];
+              if (other && other.data[di] != null) { hasData = true; sum += other.data[di]; }
+            }
+            return hasData ? Math.round(sum * 100) / 100 : null;
+          });
+          return { name: s.name, data: combined };
+        })
+      };
+      chartsForPos.push(chart);
+    }
+    bondCharts[pos] = chartsForPos;
+  }
+  data.charts_by_bond['利率债'] = bondCharts;
+
+  // 2. 时间序列: raw_table
+  const srcBonds = sources.map(s => data.raw_table[s]).filter(Boolean);
+  if (srcBonds.length > 0) {
+    const allDatesSet = new Set();
+    srcBonds.forEach(b => b.dates.forEach(d => allDatesSet.add(d)));
+    const sortedDates = [...allDatesSet].sort();
+    const terms = {};
+    const allTerms = new Set();
+    srcBonds.forEach(b => Object.keys(b.terms).forEach(t => allTerms.add(t)));
+    for (const term of allTerms) {
+      const values = [];
+      // Pre-build index maps for O(1) lookup
+      const srcMaps = srcBonds.map(b => {
+        const map = {};
+        const termData = b.terms[term];
+        if (termData) b.dates.forEach((d, i) => { if (termData[i]) map[d] = termData[i]; });
+        return map;
+      });
+      for (const date of sortedDates) {
+        const row = new Array(8).fill(0);
+        for (const sm of srcMaps) {
+          const r = sm[date];
+          if (r) for (let j = 0; j < 8; j++) row[j] += (r[j] || 0);
+        }
+        values.push(row);
+      }
+      terms[term] = values;
+    }
+    data.raw_table['利率债'] = { dates: sortedDates, terms: terms };
+  }
+}
+
+function toggle10MMA() {
+  show10MMA = document.getElementById('mmaToggle').checked;
+  renderCharts(appData);
+}
+
+function compute10MMA(data) {
+  const result = [];
+  const window = 10;
+  for (let i = 0; i < data.length; i++) {
+    if (i < window - 1 || data[i] === null || data[i] === undefined) {
+      result.push(null);
+      continue;
+    }
+    let sum = 0, count = 0;
+    for (let j = i - window + 1; j <= i; j++) {
+      if (data[j] !== null && data[j] !== undefined) {
+        sum += data[j];
+        count++;
+      }
+    }
+    result.push(count >= 5 ? Math.round(sum / count * 100) / 100 : null);
+  }
+  return result;
+}
+
+function downloadTableImage() {
+  const tableCard = document.querySelector('#section-table .table-card');
+  if (!tableCard) return;
+  html2canvas(tableCard, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = '分期限统计表.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
+function downloadChartCSV(filename, headers, rows) {
+  const BOM = '\uFEFF';
+  let csv = BOM + headers.join(',') + '\n';
+  rows.forEach(row => {
+    csv += row.map(v => v === null || v === undefined ? '' : v).join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function downloadSeasonalCSV(title, xAxisDates, seriesData, is10DMA) {
+  const years = seriesData.map(s => s.name);
+  const headers = ['\u65e5\u671f'].concat(years);
+  let dataArrays = seriesData.map(s => is10DMA ? compute10MMA(s.data) : s.data);
+  const rows = [];
+  for (let i = 0; i < xAxisDates.length; i++) {
+    const row = [xAxisDates[i]];
+    for (let j = 0; j < dataArrays.length; j++) {
+      row.push(dataArrays[j][i]);
+    }
+    rows.push(row);
+  }
+  const safeName = title.replace(/[\u00b7\s]+/g, '_');
+  downloadChartCSV(safeName + '.csv', headers, rows);
+}
+
+function downloadCumCSV(title, xAxisDates, yearSeries) {
+  const years = Object.keys(yearSeries).sort();
+  const headers = ['\u65e5\u671f'].concat(years);
+  const rows = [];
+  for (let i = 0; i < xAxisDates.length; i++) {
+    const row = [xAxisDates[i]];
+    for (const year of years) {
+      row.push(yearSeries[year][i]);
+    }
+    rows.push(row);
+  }
+  const safeName = title.replace(/[\u00b7\s]+/g, '_');
+  downloadChartCSV(safeName + '.csv', headers, rows);
+}
+
+function downloadTsCSV(title, dates, instNames, data) {
+  const headers = ['\u65e5\u671f'].concat(instNames);
+  const rows = [];
+  for (const d of dates) {
+    const row = [d];
+    const rowData = data[d];
+    for (let j = 0; j < instNames.length; j++) {
+      row.push(rowData ? Math.round((rowData[j] || 0) * 100) / 100 : 0);
+    }
+    rows.push(row);
+  }
+  const safeName = title.replace(/[\u00b7\s]+/g, '_');
+  downloadChartCSV(safeName + '.csv', headers, rows);
+}
+
+function downloadSeasonalByKey(key) {
+  const entry = _seasonalChartData.get(key);
+  if (!entry) return;
+  downloadSeasonalCSV(entry.title, appData.dates, entry.series, show10MMA);
+}
+function downloadCumByKey(key) {
+  const entry = _cumChartData.get(key);
+  if (!entry) return;
+  downloadCumCSV(entry.title, appData.dates, entry.yearSeries);
+}
+function downloadTsByKey(key) {
+  const entry = _tsChartData.get(key);
+  if (!entry) return;
+  downloadTsCSV(entry.title, entry.dates, entry.instNames, entry.data);
+}
+
+function renderCharts(data) {
+  chartInstances.forEach(c => c.dispose());
+  chartInstances = [];
+  _seasonalChartData.clear();
+
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = '';
+
+  // Collect charts: selected bond types × periods × institutions
+  const chartsToShow = [];
+  for (const bondType of selectedBondTypes) {
+    const bondCharts = data.charts_by_bond[bondType];
+    if (!bondCharts) continue;
+    for (const period of selectedPeriods) {
+      const charts = bondCharts[period];
+      if (!charts) continue;
+      for (const chart of charts) {
+        if (selectedInstitutions.includes(chart.institution)) {
+          chartsToShow.push(chart);
+        }
+      }
+    }
+  }
+
+  if (chartsToShow.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#999;grid-column:1/-1;">请选择至少一个债券类型、机构类型和剩余期限</div>';
+    document.getElementById('chartCount').textContent = '';
+    return;
+  }
+
+  document.getElementById('chartCount').textContent = `已选 ${selectedBondTypes.length} 种债券 × ${selectedInstitutions.length} 个机构 × ${selectedPeriods.length} 个期限 = ${chartsToShow.length} 张图表`;
+
+  chartsToShow.forEach((chart, idx) => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    const periodLabel = chart.period === '总' ? '全部期限' : chart.period;
+    const titleSuffix = show10MMA ? ' · 10DMA' : '';
+    const fullTitle = `${chart.bond_type} · ${periodLabel} · ${chart.institution}${titleSuffix}`;
+    const dlKey = `seasonal-${idx}`;
+    _seasonalChartData.set(dlKey, { title: fullTitle, series: chart.series });
+    card.innerHTML = `<div class="chart-header"><h3>${fullTitle}</h3><a class="download-btn" title="下载底稿" onclick="downloadSeasonalByKey('${dlKey}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a></div><div class="chart-container" id="chart-${idx}"></div>`;
+    grid.appendChild(card);
+  });
+
+  setTimeout(() => {
+    chartsToShow.forEach((chart, idx) => {
+      const el = document.getElementById('chart-' + idx);
+      if (!el) return;
+      const inst = echarts.init(el);
+      chartInstances.push(inst);
+
+      const series = [];
+      const legendData = [];
+
+      chart.series.forEach(s => {
+        // Original series (hidden when 10DMA is on)
+        if (!show10MMA) {
+          series.push({
+            name: s.name, type: 'line', data: s.data,
+            symbol: 'none', connectNulls: true,
+            lineStyle: { width: yearWidths[s.name] || 1.5, color: yearColors[s.name] || '#999' },
+            itemStyle: { color: yearColors[s.name] || '#999' },
+            emphasis: { lineStyle: { width: 3 } },
+            z: 2
+          });
+          legendData.push(s.name);
+        }
+
+        // 10DMA series
+        if (show10MMA) {
+          const mmaData = compute10MMA(s.data);
+          series.push({
+            name: s.name, type: 'line', data: mmaData,
+            symbol: 'none', connectNulls: true,
+            lineStyle: { width: (yearWidths[s.name] || 1.5) * 1.3, color: yearColors[s.name] || '#999' },
+            itemStyle: { color: yearColors[s.name] || '#999' },
+            emphasis: { lineStyle: { width: 3 } },
+            z: 3
+          });
+          legendData.push(s.name);
+        }
+      });
+
+      inst.setOption({
+        tooltip: {
+          trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+          borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+          formatter(params) {
+            let h = `<b style="color:#ddd">${params[0].axisValue}</b><br/>`;
+            params.forEach(p => {
+              if (p.value != null) h += `${p.marker} ${p.seriesName}: <b>${p.value}</b> 亿<br/>`;
+            });
+            return h;
+          }
+        },
+        legend: {
+          data: legendData, bottom: 0,
+          textStyle: { fontSize: 11 }, itemWidth: 20, itemHeight: 3,
+          itemStyle: { borderWidth: 0 },
+          selectedMode: true
+        },
+        grid: { left: 55, right: 20, top: 12, bottom: show10MMA ? 56 : 42 },
+        xAxis: {
+          type: 'category', data: data.dates, boundaryGap: false,
+          axisLabel: { interval: Math.floor(data.dates.length / 12), fontSize: 10, color: '#aaa', rotate: 0 },
+          axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
+          splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+          axisLine: { show: false }
+        },
+        series
+      });
+    });
+  }, 80);
+}
+
+
+// ========== 机构累计净买入季节性图表 ==========
+let cumChartInstances = [];
+let cumSelectedBonds = [];
+let cumSelectedInstitutions = [];
+let cumSelectedTerms = [];
+
+function initCumChartsPanel(data) {
+  // Bond type selector
+  cumSelectedBonds = [data.bond_types[0]];
+  const bondSel = document.getElementById('cumBondSelector');
+  bondSel.innerHTML = '<span class="selector-label">债券类型：</span>';
+  const allBondBtn = document.createElement('button');
+  allBondBtn.className = 'filter-btn all-btn';
+  allBondBtn.textContent = '全选';
+  allBondBtn.onclick = () => cumToggleAll('bond');
+  bondSel.appendChild(allBondBtn);
+  data.bond_types.forEach(bt => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (cumSelectedBonds.includes(bt) ? ' active' : '');
+    btn.textContent = bt;
+    btn.onclick = () => cumToggleFilter('bond', bt);
+    bondSel.appendChild(btn);
+  });
+
+  // Institution selector
+  cumSelectedInstitutions = data.institutions.slice();
+  const instSel = document.getElementById('cumInstSelector');
+  instSel.innerHTML = '<span class="selector-label">机构类型：</span>';
+  const allInstBtn = document.createElement('button');
+  allInstBtn.className = 'filter-btn all-btn active';
+  allInstBtn.textContent = '全选';
+  allInstBtn.onclick = () => cumToggleAll('inst');
+  instSel.appendChild(allInstBtn);
+  data.institutions.forEach(inst => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn active';
+    btn.textContent = inst;
+    if (inst === '其他') btn.title = '其他主要包括：券商资管、年金、养老金、社保、保险资管、财务公司、信托等';
+    btn.onclick = () => cumToggleFilter('inst', inst);
+    instSel.appendChild(btn);
+  });
+
+  // Term selector
+  cumSelectedTerms = ['总'];
+  const termSel = document.getElementById('cumTermSelector');
+  termSel.innerHTML = '<span class="selector-label">剩余期限：</span>';
+  const allTermBtn = document.createElement('button');
+  allTermBtn.className = 'filter-btn all-btn';
+  allTermBtn.textContent = '全选';
+  allTermBtn.onclick = () => cumToggleAll('term');
+  termSel.appendChild(allTermBtn);
+  data.positions.forEach(pos => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (cumSelectedTerms.includes(pos) ? ' active' : '');
+    btn.textContent = pos === '总' ? '总计' : pos;
+    btn.onclick = () => cumToggleFilter('term', pos);
+    termSel.appendChild(btn);
+  });
+}
+
+function cumToggleFilter(type, value) {
+  let arr;
+  if (type === 'bond') arr = cumSelectedBonds;
+  else if (type === 'inst') arr = cumSelectedInstitutions;
+  else arr = cumSelectedTerms;
+  const idx = arr.indexOf(value);
+  if (idx >= 0) { if (arr.length <= 1) return; arr.splice(idx, 1); }
+  else arr.push(value);
+  cumUpdateFilterUI();
+  renderCumCharts(appData);
+}
+
+function cumToggleAll(type) {
+  if (type === 'bond') cumSelectedBonds = appData.bond_types.slice();
+  else if (type === 'inst') cumSelectedInstitutions = appData.institutions.slice();
+  else cumSelectedTerms = appData.positions.slice();
+  cumUpdateFilterUI();
+  renderCumCharts(appData);
+}
+
+function cumUpdateFilterUI() {
+  const bondSel = document.getElementById('cumBondSelector');
+  bondSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(b => {
+    b.classList.toggle('active', cumSelectedBonds.includes(b.textContent));
+  });
+  const allBondBtn = bondSel.querySelector('.all-btn');
+  if (allBondBtn) allBondBtn.classList.toggle('active', cumSelectedBonds.length === appData.bond_types.length);
+
+  const instSel = document.getElementById('cumInstSelector');
+  instSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(b => {
+    b.classList.toggle('active', cumSelectedInstitutions.includes(b.textContent));
+  });
+  const allInstBtn = instSel.querySelector('.all-btn');
+  if (allInstBtn) allInstBtn.classList.toggle('active', cumSelectedInstitutions.length === appData.institutions.length);
+
+  const termSel = document.getElementById('cumTermSelector');
+  termSel.querySelectorAll('.filter-btn:not(.all-btn)').forEach(b => {
+    const val = b.textContent === '总计' ? '总' : b.textContent;
+    b.classList.toggle('active', cumSelectedTerms.includes(val));
+  });
+  const allTermBtn = termSel.querySelector('.all-btn');
+  if (allTermBtn) allTermBtn.classList.toggle('active', cumSelectedTerms.length === appData.positions.length);
+}
+
+function renderCumCharts(data) {
+  cumChartInstances.forEach(c => c.dispose());
+  cumChartInstances = [];
+  _cumChartData.clear();
+  const grid = document.getElementById('cumChartsGrid');
+  grid.innerHTML = '';
+
+  // Get institution index mapping
+  const allInst = data.institutions;
+  const instIndices = cumSelectedInstitutions.map(name => allInst.indexOf(name)).filter(i => i >= 0);
+  if (instIndices.length === 0) return;
+
+  // Determine terms to sum
+  const allTerms = Object.keys(data.raw_table[Object.keys(data.raw_table)[0]].terms);
+  const termsToSum = cumSelectedTerms.includes('总') ? allTerms : cumSelectedTerms.filter(t => t !== '总');
+  if (termsToSum.length === 0 && !cumSelectedTerms.includes('总')) return;
+
+  const xAxisDates = data.dates; // 2025 trading days (mm-dd)
+  const years = [2022, 2023, 2024, 2025, 2026];
+  const chartsToShow = [];
+
+  // For each combination: bondType × term × institution
+  for (const bondType of cumSelectedBonds) {
+    const rawBond = data.raw_table[bondType];
+    if (!rawBond) continue;
+    for (const term of cumSelectedTerms) {
+      const actualTerms = (term === '总') ? allTerms : [term];
+      for (const inst of cumSelectedInstitutions) {
+        const instIdx = allInst.indexOf(inst);
+        if (instIdx < 0) continue;
+
+        // Build cumulative series for each year
+        const yearSeries = {};
+        for (const year of years) {
+          const yearPrefix = String(year) + '-';
+          // Collect daily values for this year, summing across selected terms
+          const dailyEntries = []; // [{mmdd, value}]
+          for (let i = 0; i < rawBond.dates.length; i++) {
+            const d = rawBond.dates[i];
+            if (!d.startsWith(yearPrefix)) continue;
+            const mmdd = d.substring(5);
+            let val = 0;
+            for (const t of actualTerms) {
+              const termData = rawBond.terms[t];
+              if (termData && termData[i]) val += (termData[i][instIdx] || 0);
+            }
+            dailyEntries.push({ mmdd, val });
+          }
+          if (dailyEntries.length === 0) continue;
+
+          // Compute cumulative sum
+          let cumSum = 0;
+          const cumMap = {}; // mmdd -> cumulative value
+          for (const entry of dailyEntries) {
+            cumSum += entry.val;
+            cumMap[entry.mmdd] = Math.round(cumSum * 100) / 100;
+          }
+
+          // Map to x-axis (2025 trading days)
+          const seriesData = xAxisDates.map(mmdd => cumMap[mmdd] !== undefined ? cumMap[mmdd] : null);
+          yearSeries[String(year)] = seriesData;
+        }
+
+        const periodLabel = term === '总' ? '全部期限' : term;
+        chartsToShow.push({
+          title: `${bondType} · ${periodLabel} · ${inst}`,
+          yearSeries
+        });
+      }
+    }
+  }
+
+  if (chartsToShow.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#999;grid-column:1/-1;">请选择至少一个债券类型、机构类型和剩余期限</div>';
+    document.getElementById('cumChartCount').textContent = '';
+    return;
+  }
+
+  document.getElementById('cumChartCount').textContent =
+    `已选 ${cumSelectedBonds.length} 种债券 × ${cumSelectedInstitutions.length} 个机构 × ${cumSelectedTerms.length} 个期限 = ${chartsToShow.length} 张图表`;
+
+  chartsToShow.forEach((chart, idx) => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    const dlKey = `cum-${idx}`;
+    _cumChartData.set(dlKey, { title: chart.title, yearSeries: chart.yearSeries });
+    card.innerHTML = `<div class="chart-header"><h3>${chart.title}</h3><a class="download-btn" title="下载底稿" onclick="downloadCumByKey('${dlKey}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a></div><div class="chart-container" id="cumchart-${idx}"></div>`;
+    grid.appendChild(card);
+  });
+
+  setTimeout(() => {
+    chartsToShow.forEach((chart, idx) => {
+      const el = document.getElementById('cumchart-' + idx);
+      if (!el) return;
+      const inst = echarts.init(el);
+      cumChartInstances.push(inst);
+
+      const series = [];
+      const legendData = [];
+      const yearList = Object.keys(chart.yearSeries).sort();
+
+      yearList.forEach(year => {
+        legendData.push(year);
+        series.push({
+          name: year, type: 'line', data: chart.yearSeries[year],
+          symbol: 'none', connectNulls: true,
+          lineStyle: { width: yearWidths[year] || 1.5, color: yearColors[year] || '#999' },
+          itemStyle: { color: yearColors[year] || '#999' },
+          emphasis: { lineStyle: { width: 3 } }
+        });
+      });
+
+      inst.setOption({
+        tooltip: {
+          trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+          borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+          formatter(params) {
+            let h = `<b style="color:#ddd">${params[0].axisValue}</b><br/>`;
+            params.forEach(p => {
+              if (p.value != null) h += `${p.marker} ${p.seriesName}: <b>${p.value.toLocaleString()}</b> 亿<br/>`;
+            });
+            return h;
+          }
+        },
+        legend: {
+          data: legendData, bottom: 0,
+          textStyle: { fontSize: 11 }, itemWidth: 20, itemHeight: 3,
+          itemStyle: { borderWidth: 0 }, selectedMode: true
+        },
+        grid: { left: 60, right: 20, top: 12, bottom: 42 },
+        xAxis: {
+          type: 'category', data: xAxisDates, boundaryGap: false,
+          axisLabel: { interval: Math.floor(xAxisDates.length / 12), fontSize: 10, color: '#aaa', rotate: 0 },
+          axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value', name: '亿元',
+          axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v >= 10000 || v <= -10000 ? (v/10000).toFixed(1) + '万' : v.toFixed(0) },
+          splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+          axisLine: { show: false }
+        },
+        series
+      });
+    });
+  }, 80);
+}
+
+
+let tsChartInstances = [];
+let tsSelectedBonds = [];
+let tsSelectedTerms = [];
+
+const instColors = ['#5b8ff9','#5ad8a6','#f6bd16','#6dc8ec','#9270ca','#ff9d4d','#e8684a','#789262'];
+
+function initTimeSeriesPanel(data) {
+  // Date pickers
+  document.getElementById('tsStartDate').value = data.all_dates[Math.max(0, data.all_dates.length - 60)];
+  document.getElementById('tsEndDate').value = data.all_dates[data.all_dates.length - 1];
+  document.getElementById('tsStartDate').min = data.all_dates[0];
+  document.getElementById('tsStartDate').max = data.all_dates[data.all_dates.length - 1];
+  document.getElementById('tsEndDate').min = data.all_dates[0];
+  document.getElementById('tsEndDate').max = data.all_dates[data.all_dates.length - 1];
+
+  // Auto-render on date change
+  document.getElementById('tsStartDate').addEventListener('change', renderTimeSeries);
+  document.getElementById('tsEndDate').addEventListener('change', renderTimeSeries);
+
+  // Bond type selector (use bond_types which includes 利率债 computed on frontend)
+  tsSelectedBonds = [data.bond_types[0]];
+  const bondSel = document.getElementById('tsBondSelector');
+  bondSel.innerHTML = '<span style="font-size:13px;font-weight:600;color:#333;margin-right:8px;">债券类型：</span>';
+  data.bond_types.forEach(bt => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (tsSelectedBonds.includes(bt) ? ' active' : '');
+    btn.textContent = bt;
+    btn.onclick = () => {
+      if (tsSelectedBonds.includes(bt)) {
+        if (tsSelectedBonds.length > 1) tsSelectedBonds = tsSelectedBonds.filter(b => b !== bt);
+      } else {
+        tsSelectedBonds.push(bt);
+      }
+      bondSel.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.toggle('active', tsSelectedBonds.includes(b.textContent));
+      });
+      renderTimeSeries();
+    };
+    bondSel.appendChild(btn);
+  });
+
+  // Term selector
+  const tsTerms = ['总','1Y以下','1-3Y','3-5Y','5-7Y','7-10Y','超长'];
+  tsSelectedTerms = ['总'];
+  const termSel = document.getElementById('tsTermSelector');
+  termSel.innerHTML = '<span style="font-size:13px;font-weight:600;color:#333;margin-right:8px;">剩余期限：</span>';
+  tsTerms.forEach(tm => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (tsSelectedTerms.includes(tm) ? ' active' : '');
+    btn.textContent = tm;
+    btn.onclick = () => {
+      if (tsSelectedTerms.includes(tm)) {
+        if (tsSelectedTerms.length > 1) tsSelectedTerms = tsSelectedTerms.filter(t => t !== tm);
+      } else {
+        tsSelectedTerms.push(tm);
+      }
+      termSel.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.toggle('active', tsSelectedTerms.includes(b.textContent));
+      });
+      renderTimeSeries();
+    };
+    termSel.appendChild(btn);
+  });
+}
+
+function getISOWeek(dateStr) {
+  const d = new Date(dateStr);
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+
+function getWeekMonday(dateStr) {
+  const d = new Date(dateStr);
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - dayNum + 1);
+  const m = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  return d.getUTCFullYear() + '-' + String(m).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+}
+
+function getMonthKey(dateStr) {
+  return dateStr.substring(0, 7);
+}
+
+function adjustToWeekStart(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().substring(0, 10);
+}
+
+function adjustToWeekEnd(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diff = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().substring(0, 10);
+}
+
+function adjustToMonthStart(dateStr) {
+  return dateStr.substring(0, 8) + '01';
+}
+
+function adjustToMonthEnd(dateStr) {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + 1, 0);
+  return d.toISOString().substring(0, 10);
+}
+
+function renderTimeSeries() {
+  if (!appData) return;
+  const startDate = document.getElementById('tsStartDate').value;
+  const endDate = document.getElementById('tsEndDate').value;
+  if (!startDate || !endDate) { document.getElementById('tsHint').textContent = '请选择日期范围'; return; }
+  if (startDate > endDate) { document.getElementById('tsHint').textContent = '起始时间不能晚于结束时间'; return; }
+  document.getElementById('tsHint').textContent = '';
+
+  // Destroy old charts
+  tsChartInstances.forEach(c => c.dispose());
+  tsChartInstances = [];
+  _tsChartData.clear();
+
+  const area = document.getElementById('tsChartsArea');
+  area.innerHTML = '';
+
+  // Combine selected bond types: sum their raw_table data
+  // For '总' term, sum across all terms; for specific term, use that term
+  const instNames = appData.table_inst_headers;
+
+  for (const term of tsSelectedTerms) {
+    // Build daily data: aggregate across selected bond types
+    const dailyMap = {}; // dateStr -> [8 inst values]
+
+    for (const bt of tsSelectedBonds) {
+      const rawBond = appData.raw_table[bt];
+      if (!rawBond) continue;
+      const dates = rawBond.dates;
+      // For '总', sum across all terms; otherwise use specific term
+      const termsToSum = (term === '总') ? Object.keys(rawBond.terms) : [term];
+
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= startDate && dates[i] <= endDate) {
+          if (!dailyMap[dates[i]]) dailyMap[dates[i]] = new Array(8).fill(0);
+          for (const t of termsToSum) {
+            const row = rawBond.terms[t];
+            if (row && row[i]) {
+              for (let j = 0; j < 8; j++) dailyMap[dates[i]][j] += (row[i][j] || 0);
+            }
+          }
+        }
+      }
+    }
+
+    const dailyDates = Object.keys(dailyMap).sort();
+    if (dailyDates.length === 0) continue;
+
+    // Create 3 chart containers
+    const freqConfigs = [
+      { key: 'daily', label: '日度', dates: dailyDates, data: dailyMap },
+      { key: 'weekly', label: '周度', dates: null, data: null },
+      { key: 'monthly', label: '月度', dates: null, data: null },
+    ];
+
+    // Weekly aggregation: expand to full week boundaries
+    const weekStart = adjustToWeekStart(startDate);
+    const weekEnd = adjustToWeekEnd(endDate);
+    const weeklyMap = {};
+    for (const bt of tsSelectedBonds) {
+      const rawBond = appData.raw_table[bt];
+      if (!rawBond) continue;
+      const dates = rawBond.dates;
+      const termsToSum = (term === '总') ? Object.keys(rawBond.terms) : [term];
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= weekStart && dates[i] <= weekEnd) {
+          const wk = getWeekMonday(dates[i]);
+          if (!weeklyMap[wk]) weeklyMap[wk] = new Array(8).fill(0);
+          for (const t of termsToSum) {
+            const row = rawBond.terms[t];
+            if (row && row[i]) {
+              for (let j = 0; j < 8; j++) weeklyMap[wk][j] += (row[i][j] || 0);
+            }
+          }
+        }
+      }
+    }
+    freqConfigs[1].dates = Object.keys(weeklyMap).sort();
+    freqConfigs[1].data = weeklyMap;
+
+    // Monthly aggregation: expand to full month boundaries
+    const monthStart = adjustToMonthStart(startDate);
+    const monthEnd = adjustToMonthEnd(endDate);
+    const monthlyMap = {};
+    for (const bt of tsSelectedBonds) {
+      const rawBond = appData.raw_table[bt];
+      if (!rawBond) continue;
+      const dates = rawBond.dates;
+      const termsToSum = (term === '总') ? Object.keys(rawBond.terms) : [term];
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= monthStart && dates[i] <= monthEnd) {
+          const mk = getMonthKey(dates[i]);
+          if (!monthlyMap[mk]) monthlyMap[mk] = new Array(8).fill(0);
+          for (const t of termsToSum) {
+            const row = rawBond.terms[t];
+            if (row && row[i]) {
+              for (let j = 0; j < 8; j++) monthlyMap[mk][j] += (row[i][j] || 0);
+            }
+          }
+        }
+      }
+    }
+    freqConfigs[2].dates = Object.keys(monthlyMap).sort();
+    freqConfigs[2].data = monthlyMap;
+
+    const bondLabel = tsSelectedBonds.length === 1 ? tsSelectedBonds[0] : tsSelectedBonds.join('+');
+    const termLabel = term === '总' ? '全部期限' : term;
+
+    for (const fc of freqConfigs) {
+      if (fc.dates.length === 0) continue;
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.style.marginBottom = '20px';
+      const chartId = 'ts-chart-' + term + '-' + fc.key;
+      const tsTitle = bondLabel + ' · ' + termLabel + ' · ' + fc.label;
+      const tsKey = 'ts-' + term + '-' + fc.key;
+      _tsChartData.set(tsKey, { title: tsTitle, dates: fc.dates, instNames: instNames, data: fc.data });
+      card.innerHTML = '<div class="chart-header"><h3>' + tsTitle + '</h3>' +
+        '<a class="download-btn" title="下载底稿" onclick="downloadTsByKey(\'' + tsKey + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a></div>' +
+        '<div class="chart-container" id="' + chartId + '" style="height:420px;"></div>';
+      area.appendChild(card);
+
+      setTimeout(() => {
+        const el = document.getElementById(chartId);
+        if (!el) return;
+        const inst = echarts.init(el);
+        tsChartInstances.push(inst);
+
+        const series = [];
+        const legendData = [];
+        instNames.forEach((instName, j) => {
+          const vals = fc.dates.map(d => {
+            const row = fc.data[d];
+            return row ? Math.round((row[j] || 0) * 100) / 100 : 0;
+          });
+          series.push({
+            name: instName,
+            type: 'bar',
+            stack: 'total',
+            data: vals,
+            itemStyle: { color: instColors[j] },
+            emphasis: { focus: 'series' }
+          });
+          legendData.push(instName);
+        });
+
+        inst.setOption({
+          tooltip: {
+            trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+            borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+            formatter(params) {
+              let h = '<b style="color:#ddd">' + params[0].axisValue + '</b><br/>';
+              let total = 0;
+              params.forEach(p => {
+                if (p.value != null && p.value !== 0) {
+                  h += p.marker + ' ' + p.seriesName + ': <b>' + p.value.toFixed(2) + '</b> 亿<br/>';
+                  total += p.value;
+                }
+              });
+              h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
+              return h;
+            }
+          },
+          legend: {
+            data: legendData, top: 0,
+            textStyle: { fontSize: 11 }, itemWidth: 16, itemHeight: 10,
+            itemStyle: { borderWidth: 0 }, selectedMode: true
+          },
+          grid: { left: 60, right: 20, top: 40, bottom: 65 },
+          xAxis: {
+            type: 'category', data: fc.dates, boundaryGap: true,
+            axisLabel: {
+              interval: fc.key === 'daily' ? Math.max(0, Math.floor(fc.dates.length / 20)) : Math.max(0, Math.floor(fc.dates.length / 12)),
+              fontSize: 10, color: '#aaa', rotate: fc.key === 'daily' ? 45 : 0
+            },
+            axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value', name: '亿元',
+            axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
+            splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+            axisLine: { show: false }
+          },
+          dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
+          series
+        });
+      }, 50);
+    }
+  }
+
+  if (area.children.length === 0) {
+    area.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">未找到匹配数据，请调整筛选条件</div>';
+  }
+}
+
+window.addEventListener('resize', () => { chartInstances.forEach(c => c.resize()); tsChartInstances.forEach(c => c.resize()); });
+</script>
+</body>
+</html>
