@@ -1059,7 +1059,7 @@ function renderCumCharts(data) {
   const termsToSum = cumSelectedTerms.includes('总') ? allTerms : cumSelectedTerms.filter(t => t !== '总');
   if (termsToSum.length === 0 && !cumSelectedTerms.includes('总')) return;
 
-  const xAxisDates = data.dates; // 2025 trading days (mm-dd)
+  const xAxisDates = data.dates; // all years trading days union (mm-dd)
   const years = [2022, 2023, 2024, 2025, 2026];
   const chartsToShow = [];
 
