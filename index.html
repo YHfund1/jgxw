@@ -711,12 +711,13 @@ function compute10MMA(data) {
   const result = [];
   const window = 10;
   for (let i = 0; i < data.length; i++) {
-    if (i < window - 1 || data[i] === null || data[i] === undefined) {
+    if (data[i] === null || data[i] === undefined) {
       result.push(null);
       continue;
     }
+    // 向前收集最近10个有效值（跳过null）
     let sum = 0, count = 0;
-    for (let j = i - window + 1; j <= i; j++) {
+    for (let j = i; j >= 0 && count < window; j--) {
       if (data[j] !== null && data[j] !== undefined) {
         sum += data[j];
         count++;
