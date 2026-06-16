@@ -760,7 +760,7 @@ function downloadChartCSV(filename, headers, rows) {
 function downloadSeasonalCSV(title, xAxisDates, seriesData, is10DMA) {
   const years = seriesData.map(s => s.name);
   const headers = ['\u65e5\u671f'].concat(years);
-  let dataArrays = seriesData.map(s => is10DMA ? compute10MMA(s.data) : s.data);
+  let dataArrays = seriesData.map(s => is10DMA ? (s.dma || s.data) : s.data);
   const rows = [];
   for (let i = 0; i < xAxisDates.length; i++) {
     const row = [xAxisDates[i]];
@@ -889,7 +889,7 @@ function renderCharts(data) {
 
         // 10DMA series
         if (show10MMA) {
-          const mmaData = compute10MMA(s.data);
+          const mmaData = s.dma || compute10MMA(s.data);
           series.push({
             name: s.name, type: 'line', data: mmaData,
             symbol: 'none', connectNulls: true,
