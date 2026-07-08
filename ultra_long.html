@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>超长利率债分析</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: #f0f2f5; color: #333;
+    }
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      padding: 24px 40px; text-align: center;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .header h1 { color: #fff; font-size: 26px; font-weight: 600; letter-spacing: 3px; }
+    .header .subtitle { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 8px; }
+    .nav-tabs {
+      display: flex; justify-content: center; gap: 12px;
+      padding: 16px 40px; background: #fff; border-bottom: 1px solid #e8e8e8;
+      position: sticky; top: 80px; z-index: 99;
+    }
+    .nav-tab {
+      padding: 10px 32px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 500; transition: all 0.2s;
+      border: 1px solid #d9d9d9; background: #fff; color: #666;
+    }
+    .nav-tab:hover { border-color: #1890ff; color: #1890ff; }
+    .nav-tab.active { background: linear-gradient(135deg, #1890ff, #096dd9); color: #fff; border-color: transparent; }
+    .content { max-width: 1440px; margin: 0 auto; padding: 24px; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .date-range-bar {
+      background: #fff; border-radius: 12px; padding: 14px 24px; margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .date-label { font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; }
+    .date-input { padding: 6px 12px; border-radius: 6px; border: 1px solid #d9d9d9; font-size: 13px; color: #333; outline: none; }
+    .date-input:focus { border-color: #1890ff; }
+    .date-apply-btn {
+      padding: 6px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; border: none;
+      background: linear-gradient(135deg, #1890ff, #096dd9); color: #fff; transition: opacity 0.2s;
+    }
+    .date-apply-btn:hover { opacity: 0.85; }
+    .date-hint { font-size: 12px; color: #999; margin-left: 8px; }
+    .table-card {
+      background: #fff; border-radius: 12px; padding: 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .table-card h2 {
+      font-size: 18px; color: #1a1a2e; margin-bottom: 20px;
+      padding-bottom: 12px; border-bottom: 3px solid #1890ff; display: inline-block;
+    }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th { background: #f8f9fa; padding: 10px 8px; text-align: center; font-weight: 600; border: 1px solid #e8e8e8; color: #333; white-space: nowrap; }
+    .data-table td { padding: 8px; text-align: center; border: 1px solid #f0f0f0; white-space: nowrap; position: relative; }
+    .data-table tr:hover td { background: #f5f9ff; }
+    .cat-cell { text-align: left !important; font-weight: 600; background: #fafbfc !important; padding-left: 14px !important; color: #333; }
+    .sub-cell { text-align: left !important; padding-left: 14px !important; color: #555; }
+    .section-row td { background: #f8f9fa !important; font-weight: 600; font-size: 12px; color: #555; padding: 6px 8px !important; text-align: center !important; border-bottom: 2px solid #e0e0e0; }
+    .section-row td.sec-title { background: linear-gradient(135deg, #e6f7ff, #f0f5ff) !important; font-weight: 700; color: #1890ff; font-size: 14px; padding: 10px 14px !important; text-align: left !important; border-bottom: 2px solid #1890ff; }
+    .section-row td.sec-inst { background: #f8f9fa !important; font-weight: 600; color: #333; padding: 10px 8px !important; text-align: center !important; border-bottom: 2px solid #1890ff; }
+    .summary-row td { font-weight: 600; }
+    .v-pos { color: #389e0d; font-weight: 500; }
+    .v-neg { color: #cf1322; font-weight: 500; }
+    .v-zero { color: #bbb; }
+    .filter-panel {
+      background: #fff; border-radius: 12px; padding: 18px 24px; margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filter-row + .filter-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f0; }
+    .filter-row .selector-label { font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; min-width: 80px; }
+    .filter-btn {
+      padding: 7px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: all 0.2s;
+      border: 1px solid #d9d9d9; background: #fff; color: #666; position: relative;
+    }
+    .filter-btn:hover { border-color: #1890ff; color: #1890ff; }
+    .filter-btn.active { background: linear-gradient(135deg, #1890ff, #096dd9); color: #fff; border-color: transparent; }
+    .filter-btn.all-btn { font-weight: 600; border-style: dashed; }
+    .filter-btn.all-btn.active { border-style: solid; background: linear-gradient(135deg, #52c41a, #389e0d); }
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .chart-card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+    }
+    .chart-card h3 { font-size: 15px; color: #333; margin-bottom: 12px; padding-left: 10px; border-left: 4px solid #1890ff; }
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .chart-header h3 { margin-bottom: 0; }
+    .chart-header h2 { margin-bottom: 0; }
+    .chart-container { width: 100%; height: 380px; }
+    .mma-toggle { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f0; }
+    .mma-toggle label { font-size: 13px; font-weight: 600; color: #333; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .mma-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1890ff; cursor: pointer; }
+    .mma-toggle .mma-hint { font-size: 11px; color: #999; }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } .content { padding: 12px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>超长利率债分析</h1>
+    <div class="subtitle">数据来源：CFETS</div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-tab="table" onclick="switchTab('table', this)">分期限统计表</div>
+    <div class="nav-tab" data-tab="charts" onclick="switchTab('charts', this)">机构净买入（季节性）</div>
+    <div class="nav-tab" data-tab="timeseries" onclick="switchTab('timeseries', this)">时间序列</div>
+  </div>
+  <div class="content">
+    <!-- Tab 1: 分期限统计表 -->
+    <div id="section-table" class="section active">
+      <div class="filter-panel" style="margin-bottom:16px;">
+        <div class="filter-row" id="ulDataTypeSelector"></div>
+        <div class="filter-row" id="ulBondZoneSelector"></div>
+      </div>
+      <div class="date-range-bar">
+        <span class="date-label">起始时间：</span>
+        <input type="date" id="ulStartDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;">结束时间：</span>
+        <input type="date" id="ulEndDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyUlDateRange()">应用</button>
+        <span class="date-hint" id="ulDateHint"></span>
+      </div>
+      <div class="table-card">
+        <div class="chart-header"><h2 id="ulTableTitle">分期限统计表（净买入，亿元）</h2></div>
+        <div style="overflow-x:auto;"><table class="data-table" id="ulDataTable"></table></div>
+      </div>
+      <div class="date-range-bar" style="margin-top:16px;">
+        <span class="date-label" style="color:#fa8c16;">上期起始时间：</span>
+        <input type="date" id="ulPrevStartDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;color:#fa8c16;">上期结束时间：</span>
+        <input type="date" id="ulPrevEndDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyUlDateRange()" style="background:linear-gradient(135deg,#fa8c16,#d46b08);">应用</button>
+        <span class="date-hint" id="ulPrevDateHint"></span>
+      </div>
+    </div>
+    <!-- Tab 2: 机构净买入（季节性） -->
+    <div id="section-charts" class="section">
+      <div class="filter-panel" id="ulChartFilterPanel">
+        <div class="filter-row" id="ulChartDataTypeSelector"></div>
+        <div class="filter-row" id="ulChartBondSelector"></div>
+        <div class="filter-row" id="ulChartInstSelector"></div>
+        <div class="filter-row" id="ulChartPeriodSelector"></div>
+        <div style="margin-top:10px;font-size:12px;color:#999;" id="ulChartCount"></div>
+        <div class="mma-toggle">
+          <label><input type="checkbox" id="ulMmaToggle" onchange="renderUlCharts()" checked> 显示10日移动平均线（10DMA）</label>
+          <span class="mma-hint">只显示平滑曲线，隐藏原始数据</span>
+        </div>
+      </div>
+      <div class="charts-grid" id="ulChartsGrid"></div>
+    </div>
+    <!-- Tab 3: 时间序列 -->
+    <div id="section-timeseries" class="section">
+      <div class="filter-panel">
+        <div class="date-range-bar" style="box-shadow:none;border:none;padding:0;margin-bottom:12px;">
+          <span class="date-label">起始时间：</span>
+          <input type="date" id="ulTsStartDate" class="date-input">
+          <span class="date-label" style="margin-left:16px;">结束时间：</span>
+          <input type="date" id="ulTsEndDate" class="date-input">
+        </div>
+        <div class="filter-row" id="ulTsDataTypeSelector"></div>
+        <div class="filter-row" id="ulTsBondSelector"></div>
+        <div class="filter-row" id="ulTsTermSelector"></div>
+        <div style="margin-top:12px;"><span class="date-hint" id="ulTsHint"></span></div>
+      </div>
+      <div id="ulTsChartsArea" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
+<script>
+let appData = null;
+let chartInstances = [];
+let tsChartInstances = [];
+
+// Filter states
+let ulDataType = '净买入';
+let ulSelectedZones = [];
+let ulChartDataType = '净买入';
+let ulChartBonds = [];
+let ulChartInsts = [];
+let ulChartPeriods = ['总'];
+let show10MMA = true;
+let ulTsDataType = '净买入';
+let ulTsBonds = [];
+let ulTsTerms = ['总'];
+
+const yearColors = {'2020':'#6c757d','2021':'#adb5bd','2022':'#74b9ff','2023':'#2196F3','2024':'#1565C0','2025':'#0d47a1','2026':'#e74c3c'};
+const yearWidths = {'2020':1.0,'2021':1.2,'2022':1.5,'2023':1.8,'2024':2,'2025':2.2,'2026':2.5};
+const instColors = ['#5b8ff9','#5ad8a6','#f6bd16','#6dc8ec','#9270ca','#ff9d4d','#e8684a','#789262'];
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('section-'+tab).classList.add('active');
+  if(tab==='charts') setTimeout(()=>chartInstances.forEach(c=>c.resize()),150);
+  if(tab==='timeseries') setTimeout(()=>{ if(tsChartInstances.length) tsChartInstances.forEach(c=>c.resize()); },150);
+}
+
+// ===== Helper =====
+function fmtText(v) {
+  if(v===null||v===undefined) return '-';
+  const n = typeof v==='number' ? v : parseFloat(v);
+  if(isNaN(n)) return String(v);
+  const r = Math.round(n);
+  if(r===0) return '0';
+  return (r>0?'+':'')+r;
+}
+function summaryBg(val, maxAbs) {
+  if (val===null||val===undefined||maxAbs===0) return '';
+  const n = typeof val==='number' ? val : parseFloat(val);
+  if (isNaN(n)||n===0) return '';
+  const ratio = Math.min(Math.abs(n)/maxAbs, 1);
+  const t = Math.pow(ratio, 0.55);
+  if (n > 0) { const r=255, g=Math.round(245-t*195), b=Math.round(245-t*210); return `rgb(${r},${g},${b})`; }
+  else { const r=Math.round(245-t*210), g=Math.round(245-t*135), b=Math.round(250-t*180); return `rgb(${r},${g},${b})`; }
+}
+
+// ===== Data Loading =====
+fetch('ultra_long_data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
+  appData = data;
+  ulSelectedZones = data.bond_zones.slice();
+  ulChartBonds = [data.bond_zones[0]];
+  ulChartInsts = data.institutions.slice();
+  ulTsBonds = [data.bond_zones[0]];
+
+  // Date pickers
+  document.getElementById('ulStartDate').value = data.default_start;
+  document.getElementById('ulEndDate').value = data.default_end;
+  document.getElementById('ulStartDate').min = data.all_dates[0];
+  document.getElementById('ulStartDate').max = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulEndDate').min = data.all_dates[0];
+  document.getElementById('ulEndDate').max = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulPrevStartDate').value = data.default_start;
+  document.getElementById('ulPrevEndDate').value = data.default_end;
+  document.getElementById('ulPrevStartDate').min = data.all_dates[0];
+  document.getElementById('ulPrevStartDate').max = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulPrevEndDate').min = data.all_dates[0];
+  document.getElementById('ulPrevEndDate').max = data.all_dates[data.all_dates.length-1];
+
+  // Time series date pickers
+  document.getElementById('ulTsStartDate').value = data.all_dates[Math.max(0, data.all_dates.length-60)];
+  document.getElementById('ulTsEndDate').value = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulTsStartDate').min = data.all_dates[0];
+  document.getElementById('ulTsStartDate').max = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulTsEndDate').min = data.all_dates[0];
+  document.getElementById('ulTsEndDate').max = data.all_dates[data.all_dates.length-1];
+  document.getElementById('ulTsStartDate').addEventListener('change', renderUlTimeSeries);
+  document.getElementById('ulTsEndDate').addEventListener('change', renderUlTimeSeries);
+
+  initUlFilterPanels(data);
+  applyUlDateRange();
+  renderUlCharts();
+  renderUlTimeSeries();
+}).catch(err=>{
+  document.querySelector('.content').innerHTML = '<div style="text-align:center;padding:80px;color:#999;font-size:16px;">数据加载失败，请确保 ultra_long_data.json 文件存在<br><small>'+err.message+'</small></div>';
+});
+
+// ===== Filter Panel Init =====
+function initUlFilterPanels(data) {
+  // Data type selectors (3 places: table, chart, timeseries)
+  ['ulDataTypeSelector','ulChartDataTypeSelector','ulTsDataTypeSelector'].forEach((id, idx) => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<span class="selector-label">数据类型：</span>';
+    const defaultVal = ['净买入','净买入','净买入'][idx];
+    data.data_types.forEach(dt => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn' + (dt===defaultVal ? ' active' : '');
+      btn.textContent = dt;
+      btn.onclick = () => {
+        el.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        if(id==='ulDataTypeSelector') { ulDataType=dt; applyUlDateRange(); }
+        else if(id==='ulChartDataTypeSelector') { ulChartDataType=dt; renderUlCharts(); }
+        else { ulTsDataType=dt; renderUlTimeSeries(); }
+      };
+      el.appendChild(btn);
+    });
+  });
+
+  // Bond zone selector (table)
+  const zoneEl = document.getElementById('ulBondZoneSelector');
+  zoneEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  const allZoneBtn = document.createElement('button');
+  allZoneBtn.className = 'filter-btn all-btn active';
+  allZoneBtn.textContent = '全选';
+  allZoneBtn.onclick = () => {
+    ulSelectedZones = ulSelectedZones.length===data.bond_zones.length ? [] : data.bond_zones.slice();
+    zoneEl.querySelectorAll('.filter-btn').forEach(b => {
+      if(b.textContent==='全选') b.classList.toggle('active', ulSelectedZones.length===data.bond_zones.length);
+      else b.classList.toggle('active', ulSelectedZones.includes(b.textContent));
+    });
+    applyUlDateRange();
+  };
+  zoneEl.appendChild(allZoneBtn);
+  data.bond_zones.forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn active'; btn.textContent = z;
+    btn.onclick = () => {
+      if(ulSelectedZones.includes(z)) { if(ulSelectedZones.length>1) ulSelectedZones=ulSelectedZones.filter(x=>x!==z); }
+      else ulSelectedZones.push(z);
+      zoneEl.querySelectorAll('.filter-btn').forEach(b => {
+        if(b.textContent==='全选') b.classList.toggle('active', ulSelectedZones.length===data.bond_zones.length);
+        else b.classList.toggle('active', ulSelectedZones.includes(b.textContent));
+      });
+      applyUlDateRange();
+    };
+    zoneEl.appendChild(btn);
+  });
+
+  // Chart: bond zone selector (single-select style, multi allowed)
+  const cbEl = document.getElementById('ulChartBondSelector');
+  cbEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  data.bond_zones.forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (ulChartBonds.includes(z)?' active':'');
+    btn.textContent = z;
+    btn.onclick = () => {
+      if(ulChartBonds.includes(z)) { if(ulChartBonds.length>1) ulChartBonds=ulChartBonds.filter(x=>x!==z); }
+      else ulChartBonds.push(z);
+      cbEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', ulChartBonds.includes(b.textContent)));
+      renderUlCharts();
+    };
+    cbEl.appendChild(btn);
+  });
+
+  // Chart: institution selector
+  const ciEl = document.getElementById('ulChartInstSelector');
+  ciEl.innerHTML = '<span class="selector-label">机构类型：</span>';
+  const allInstBtn = document.createElement('button');
+  allInstBtn.className = 'filter-btn all-btn active'; allInstBtn.textContent = '全选';
+  allInstBtn.onclick = () => {
+    ulChartInsts = ulChartInsts.length===data.institutions.length ? [] : data.institutions.slice();
+    ciEl.querySelectorAll('.filter-btn').forEach(b => {
+      if(b.textContent==='全选') b.classList.toggle('active', ulChartInsts.length===data.institutions.length);
+      else b.classList.toggle('active', ulChartInsts.includes(b.textContent));
+    });
+    renderUlCharts();
+  };
+  ciEl.appendChild(allInstBtn);
+  data.institutions.forEach(inst => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn active'; btn.textContent = inst;
+    btn.onclick = () => {
+      if(ulChartInsts.includes(inst)) { if(ulChartInsts.length>1) ulChartInsts=ulChartInsts.filter(x=>x!==inst); }
+      else ulChartInsts.push(inst);
+      ciEl.querySelectorAll('.filter-btn').forEach(b => {
+        if(b.textContent==='全选') b.classList.toggle('active', ulChartInsts.length===data.institutions.length);
+        else b.classList.toggle('active', ulChartInsts.includes(b.textContent));
+      });
+      renderUlCharts();
+    };
+    ciEl.appendChild(btn);
+  });
+
+  // Chart: period selector
+  const cpEl = document.getElementById('ulChartPeriodSelector');
+  cpEl.innerHTML = '<span class="selector-label">剩余期限：</span>';
+  const allPosBtn = document.createElement('button');
+  allPosBtn.className = 'filter-btn all-btn'; allPosBtn.textContent = '全选';
+  allPosBtn.onclick = () => {
+    ulChartPeriods = ulChartPeriods.length===data.chart_positions.length ? ['总'] : data.chart_positions.slice();
+    cpEl.querySelectorAll('.filter-btn').forEach(b => {
+      if(b.textContent==='全选') b.classList.toggle('active', ulChartPeriods.length===data.chart_positions.length);
+      else b.classList.toggle('active', ulChartPeriods.includes(b.textContent));
+    });
+    renderUlCharts();
+  };
+  cpEl.appendChild(allPosBtn);
+  data.chart_positions.forEach(pos => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (ulChartPeriods.includes(pos)?' active':'');
+    btn.textContent = pos;
+    btn.onclick = () => {
+      if(ulChartPeriods.includes(pos)) { if(ulChartPeriods.length>1) ulChartPeriods=ulChartPeriods.filter(x=>x!==pos); }
+      else ulChartPeriods.push(pos);
+      cpEl.querySelectorAll('.filter-btn').forEach(b => {
+        if(b.textContent==='全选') b.classList.toggle('active', ulChartPeriods.length===data.chart_positions.length);
+        else b.classList.toggle('active', ulChartPeriods.includes(b.textContent));
+      });
+      renderUlCharts();
+    };
+    cpEl.appendChild(btn);
+  });
+
+  // TS: bond selector
+  const tsbEl = document.getElementById('ulTsBondSelector');
+  tsbEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  ulTsBonds.forEach(z => {
+    // pre-select
+  });
+  data.bond_zones.forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (ulTsBonds.includes(z)?' active':'');
+    btn.textContent = z;
+    btn.onclick = () => {
+      if(ulTsBonds.includes(z)) { if(ulTsBonds.length>1) ulTsBonds=ulTsBonds.filter(x=>x!==z); }
+      else ulTsBonds.push(z);
+      tsbEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', ulTsBonds.includes(b.textContent)));
+      renderUlTimeSeries();
+    };
+    tsbEl.appendChild(btn);
+  });
+
+  // TS: term selector
+  const tstEl = document.getElementById('ulTsTermSelector');
+  tstEl.innerHTML = '<span class="selector-label">剩余期限：</span>';
+  data.ts_terms.forEach(tm => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (ulTsTerms.includes(tm)?' active':'');
+    btn.textContent = tm;
+    btn.onclick = () => {
+      if(ulTsTerms.includes(tm)) { if(ulTsTerms.length>1) ulTsTerms=ulTsTerms.filter(x=>x!==tm); }
+      else ulTsTerms.push(tm);
+      tstEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', ulTsTerms.includes(b.textContent)));
+      renderUlTimeSeries();
+    };
+    tstEl.appendChild(btn);
+  });
+}
+
+// ===== Tab 1: 分期限统计表 =====
+function ulSumRange(rawZoneData, termName, startDate, endDate) {
+  const dates = rawZoneData.dates;
+  const values = rawZoneData.terms[termName];
+  if (!values) return new Array(8).fill(0);
+  const sum = new Array(8).fill(0);
+  for (let i = 0; i < dates.length; i++) {
+    if (dates[i] >= startDate && dates[i] <= endDate) {
+      const row = values[i];
+      for (let j = 0; j < 8; j++) sum[j] += (row[j] || 0);
+    }
+  }
+  return sum.map(v => Math.round(v * 100) / 100);
+}
+
+function applyUlDateRange() {
+  const startDate = document.getElementById('ulStartDate').value;
+  const endDate = document.getElementById('ulEndDate').value;
+  if (!startDate || !endDate) return;
+  if (startDate > endDate) { document.getElementById('ulDateHint').textContent = '⚠ 起始时间不能晚于结束时间'; return; }
+  document.getElementById('ulDateHint').textContent = '';
+  const prevStart = document.getElementById('ulPrevStartDate').value;
+  const prevEnd = document.getElementById('ulPrevEndDate').value;
+  if (prevStart > prevEnd) { document.getElementById('ulPrevDateHint').textContent = '⚠ 上期时间无效'; return; }
+  document.getElementById('ulPrevDateHint').textContent = '';
+
+  renderUlTable(startDate, endDate, prevStart, prevEnd);
+}
+
+function renderUlTable(startDate, endDate, prevStart, prevEnd) {
+  const data = appData;
+  const rawTable = data.raw_table[ulDataType];
+  const instHeaders = data.institutions;
+  const termsList = data.terms_with_total; // ['1Y以下',...,'30年以上','总计']
+
+  document.getElementById('ulTableTitle').textContent = `分期限统计表（${ulDataType}，亿元）`;
+
+  let maxAbs = 0;
+  const zoneRows = {};
+  for (const zone of ulSelectedZones) {
+    const rawZone = rawTable[zone];
+    if (!rawZone) continue;
+    zoneRows[zone] = {};
+    for (const term of termsList) {
+      const cur = ulSumRange(rawZone, term, startDate, endDate);
+      const prev = ulSumRange(rawZone, term, prevStart, prevEnd);
+      zoneRows[zone][term] = { cur, prev };
+      for (let j = 0; j < 8; j++) { maxAbs = Math.max(maxAbs, Math.abs(cur[j]), Math.abs(prev[j])); }
+    }
+  }
+
+  let html = '<tbody>';
+  for (const zone of ulSelectedZones) {
+    if (!zoneRows[zone]) continue;
+    html += `<tr class="section-row"><td class="sec-title">${zone}</td>`;
+    instHeaders.forEach(h => html += `<td class="sec-inst">${h}</td>`);
+    html += '</tr>';
+    for (const term of termsList) {
+      const row = zoneRows[zone][term];
+      if (!row) continue;
+      html += '<tr>';
+      html += `<td class="sub-cell">${term}</td>`;
+      for (let j = 0; j < 8; j++) {
+        const text = fmtText(row.cur[j]);
+        const bg = summaryBg(row.cur[j], maxAbs);
+        const style = bg ? `background:${bg};color:#000;` : 'color:#000;';
+        html += `<td style="${style}">${text}</td>`;
+      }
+      html += '</tr>';
+    }
+  }
+
+  // Summary row (sum across all selected zones, all terms except 总计)
+  html += '<tr class="section-row"><td class="sec-title">汇总</td>';
+  instHeaders.forEach(h => html += `<td class="sec-inst">${h}</td>`);
+  html += '</tr>';
+  const sumCur = new Array(8).fill(0), sumPrev = new Array(8).fill(0);
+  for (const zone of ulSelectedZones) {
+    if (!zoneRows[zone]) continue;
+    for (const term of data.terms) { // exclude 总计 to avoid double counting
+      const row = zoneRows[zone][term];
+      if (!row) continue;
+      for (let j = 0; j < 8; j++) { sumCur[j] += row.cur[j]; sumPrev[j] += row.prev[j]; }
+    }
+  }
+  const curRound = sumCur.map(v => Math.round(v*100)/100);
+  const prevRound = sumPrev.map(v => Math.round(v*100)/100);
+  html += `<tr class="summary-row"><td class="cat-cell">本期${ulDataType}（${startDate.replace(/-/g,'/')}-${endDate.replace(/-/g,'/')}）</td>`;
+  for (let j=0;j<8;j++) { const t=fmtText(curRound[j]); const bg=summaryBg(curRound[j],maxAbs); html+=`<td style="${bg?'background:'+bg+';color:#000;':'color:#000;'}">${t}</td>`; }
+  html += '</tr>';
+  html += `<tr class="summary-row"><td class="cat-cell">上期${ulDataType}（${prevStart.replace(/-/g,'/')}-${prevEnd.replace(/-/g,'/')}）</td>`;
+  for (let j=0;j<8;j++) { const t=fmtText(prevRound[j]); const bg=summaryBg(prevRound[j],maxAbs); html+=`<td style="${bg?'background:'+bg+';color:#000;':'color:#000;'}">${t}</td>`; }
+  html += '</tr>';
+
+  html += '</tbody>';
+  document.getElementById('ulDataTable').innerHTML = html;
+}
+
+// ===== Tab 2: 季节性图表 =====
+function compute10MMA(data) {
+  const result = [];
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] === null || data[i] === undefined) { result.push(null); continue; }
+    const start = Math.max(0, i - 9);
+    let sum = 0, count = 0;
+    for (let j = start; j <= i; j++) { if (data[j] !== null && data[j] !== undefined) { sum += data[j]; count++; } }
+    result.push(count >= 5 ? Math.round(sum / count * 100) / 100 : null);
+  }
+  return result;
+}
+
+function renderUlCharts() {
+  chartInstances.forEach(c => c.dispose());
+  chartInstances = [];
+  const data = appData;
+  const grid = document.getElementById('ulChartsGrid');
+  grid.innerHTML = '';
+  show10MMA = document.getElementById('ulMmaToggle').checked;
+
+  const chartsToShow = [];
+  const bondData = data.charts_by_bond[ulChartDataType];
+  if (!bondData) return;
+
+  for (const zone of ulChartBonds) {
+    const zoneData = bondData[zone];
+    if (!zoneData) continue;
+    for (const pos of ulChartPeriods) {
+      const posData = zoneData[pos];
+      if (!posData) continue;
+      for (const inst of ulChartInsts) {
+        const chart = posData[inst];
+        if (chart) chartsToShow.push(chart);
+      }
+    }
+  }
+
+  if (chartsToShow.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#999;grid-column:1/-1;">请选择至少一个债券区域、机构和期限</div>';
+    document.getElementById('ulChartCount').textContent = '';
+    return;
+  }
+
+  document.getElementById('ulChartCount').textContent =
+    `${ulChartBonds.length} 区域 × ${ulChartInsts.length} 机构 × ${ulChartPeriods.length} 期限 = ${chartsToShow.length} 张图表`;
+
+  chartsToShow.forEach((chart, idx) => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    const periodLabel = chart.period === '总' ? '全部期限' : chart.period;
+    const titleSuffix = show10MMA ? ' · 10DMA' : '';
+    const fullTitle = `${chart.bond_zone} · ${periodLabel} · ${chart.institution}${titleSuffix}`;
+    card.innerHTML = `<div class="chart-header"><h3>${fullTitle}</h3></div><div class="chart-container" id="ulchart-${idx}"></div>`;
+    grid.appendChild(card);
+  });
+
+  setTimeout(() => {
+    chartsToShow.forEach((chart, idx) => {
+      const el = document.getElementById('ulchart-' + idx);
+      if (!el) return;
+      const inst = echarts.init(el);
+      chartInstances.push(inst);
+      const series = [], legendData = [];
+      chart.series.forEach(s => {
+        const seriesData = show10MMA ? (s.dma || compute10MMA(s.data)) : s.data;
+        series.push({
+          name: s.name, type: 'line', data: seriesData,
+          symbol: 'none', connectNulls: true,
+          lineStyle: { width: (yearWidths[s.name]||1.5) * (show10MMA?1.3:1), color: yearColors[s.name]||'#999' },
+          itemStyle: { color: yearColors[s.name]||'#999' },
+          emphasis: { lineStyle: { width: 3 } }, z: show10MMA ? 3 : 2
+        });
+        legendData.push(s.name);
+      });
+      inst.setOption({
+        tooltip: {
+          trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+          borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+          formatter(params) {
+            let h = `<b style="color:#ddd">${params[0].axisValue}</b><br/>`;
+            params.forEach(p => { if (p.value != null) h += `${p.marker} ${p.seriesName}: <b>${p.value}</b> 亿<br/>`; });
+            return h;
+          }
+        },
+        legend: { data: legendData, bottom: 0, textStyle: { fontSize: 11 }, itemWidth: 20, itemHeight: 3, selectedMode: true },
+        grid: { left: 55, right: 20, top: 12, bottom: show10MMA ? 56 : 42 },
+        xAxis: {
+          type: 'category', data: data.dates, boundaryGap: false,
+          axisLabel: { interval: Math.floor(data.dates.length / 12), fontSize: 10, color: '#aaa' },
+          axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
+          splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
+        },
+        series
+      });
+    });
+  }, 80);
+}
+
+// ===== Tab 3: 时间序列 =====
+function getISOWeek(dateStr) {
+  const d = new Date(dateStr); const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+function getWeekMonday(dateStr) {
+  const d = new Date(dateStr); const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - dayNum + 1);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function getMonthKey(dateStr) { return dateStr.substring(0, 7); }
+function adjustToWeekStart(dateStr) {
+  const d = new Date(dateStr); const day = d.getDay(); const diff = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diff); return d.toISOString().substring(0, 10);
+}
+function adjustToWeekEnd(dateStr) {
+  const d = new Date(dateStr); const day = d.getDay(); const diff = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + diff); return d.toISOString().substring(0, 10);
+}
+function adjustToMonthStart(s) { return s.substring(0, 8) + '01'; }
+function adjustToMonthEnd(s) { const d = new Date(s); d.setMonth(d.getMonth() + 1, 0); return d.toISOString().substring(0, 10); }
+
+function renderUlTimeSeries() {
+  if (!appData) return;
+  const data = appData;
+  const startDate = document.getElementById('ulTsStartDate').value;
+  const endDate = document.getElementById('ulTsEndDate').value;
+  if (!startDate || !endDate) return;
+  if (startDate > endDate) { document.getElementById('ulTsHint').textContent = '起始时间不能晚于结束时间'; return; }
+  document.getElementById('ulTsHint').textContent = '';
+
+  tsChartInstances.forEach(c => c.dispose());
+  tsChartInstances = [];
+  const area = document.getElementById('ulTsChartsArea');
+  area.innerHTML = '';
+
+  const instNames = data.institutions;
+  const rawTable = data.raw_table[ulTsDataType];
+  if (!rawTable) return;
+
+  for (const term of ulTsTerms) {
+    const dailyMap = {};
+    for (const zone of ulTsBonds) {
+      const rawZone = rawTable[zone];
+      if (!rawZone) continue;
+      const dates = rawZone.dates;
+      const termsToSum = (term === '总') ? data.terms : [term];
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= startDate && dates[i] <= endDate) {
+          if (!dailyMap[dates[i]]) dailyMap[dates[i]] = new Array(8).fill(0);
+          for (const t of termsToSum) {
+            const row = rawZone.terms[t];
+            if (row && row[i]) for (let j = 0; j < 8; j++) dailyMap[dates[i]][j] += (row[i][j] || 0);
+          }
+        }
+      }
+    }
+    const dailyDates = Object.keys(dailyMap).sort();
+    if (dailyDates.length === 0) continue;
+
+    // Weekly
+    const weekStart = adjustToWeekStart(startDate), weekEnd = adjustToWeekEnd(endDate);
+    const weeklyMap = {};
+    for (const zone of ulTsBonds) {
+      const rawZone = rawTable[zone]; if (!rawZone) continue;
+      const dates = rawZone.dates;
+      const termsToSum = (term === '总') ? data.terms : [term];
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= weekStart && dates[i] <= weekEnd) {
+          const wk = getWeekMonday(dates[i]);
+          if (!weeklyMap[wk]) weeklyMap[wk] = new Array(8).fill(0);
+          for (const t of termsToSum) { const row = rawZone.terms[t]; if (row && row[i]) for (let j=0;j<8;j++) weeklyMap[wk][j] += (row[i][j]||0); }
+        }
+      }
+    }
+    // Monthly
+    const monthStart = adjustToMonthStart(startDate), monthEnd = adjustToMonthEnd(endDate);
+    const monthlyMap = {};
+    for (const zone of ulTsBonds) {
+      const rawZone = rawTable[zone]; if (!rawZone) continue;
+      const dates = rawZone.dates;
+      const termsToSum = (term === '总') ? data.terms : [term];
+      for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= monthStart && dates[i] <= monthEnd) {
+          const mk = getMonthKey(dates[i]);
+          if (!monthlyMap[mk]) monthlyMap[mk] = new Array(8).fill(0);
+          for (const t of termsToSum) { const row = rawZone.terms[t]; if (row && row[i]) for (let j=0;j<8;j++) monthlyMap[mk][j] += (row[i][j]||0); }
+        }
+      }
+    }
+
+    const freqConfigs = [
+      { key: 'daily', label: '日度', dates: dailyDates, data: dailyMap },
+      { key: 'weekly', label: '周度', dates: Object.keys(weeklyMap).sort(), data: weeklyMap },
+      { key: 'monthly', label: '月度', dates: Object.keys(monthlyMap).sort(), data: monthlyMap },
+    ];
+
+    const bondLabel = ulTsBonds.join('+');
+    const termLabel = term === '总' ? '全部期限' : term;
+
+    for (const fc of freqConfigs) {
+      if (fc.dates.length === 0) continue;
+      const card = document.createElement('div');
+      card.className = 'chart-card'; card.style.marginBottom = '20px';
+      const chartId = 'ul-ts-' + term + '-' + fc.key;
+      const tsTitle = ulTsDataType + ' · ' + bondLabel + ' · ' + termLabel + ' · ' + fc.label;
+      card.innerHTML = `<div class="chart-header"><h3>${tsTitle}</h3></div><div class="chart-container" id="${chartId}" style="height:420px;"></div>`;
+      area.appendChild(card);
+
+      setTimeout(() => {
+        const el = document.getElementById(chartId);
+        if (!el) return;
+        const inst = echarts.init(el);
+        tsChartInstances.push(inst);
+        const series = [], legendData = [];
+        instNames.forEach((instName, j) => {
+          const vals = fc.dates.map(d => { const row = fc.data[d]; return row ? Math.round((row[j]||0)*100)/100 : 0; });
+          series.push({ name: instName, type: 'bar', stack: 'total', data: vals, itemStyle: { color: instColors[j] }, emphasis: { focus: 'series' } });
+          legendData.push(instName);
+        });
+        inst.setOption({
+          tooltip: {
+            trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+            borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+            formatter(params) {
+              let h = '<b style="color:#ddd">' + params[0].axisValue + '</b><br/>';
+              let total = 0;
+              params.forEach(p => { if (p.value != null && p.value !== 0) { h += p.marker + ' ' + p.seriesName + ': <b>' + p.value.toFixed(2) + '</b> 亿<br/>'; total += p.value; } });
+              h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
+              return h;
+            }
+          },
+          legend: { data: legendData, top: 0, textStyle: { fontSize: 11 }, itemWidth: 16, itemHeight: 10, selectedMode: true },
+          grid: { left: 60, right: 20, top: 40, bottom: 65 },
+          xAxis: {
+            type: 'category', data: fc.dates, boundaryGap: true,
+            axisLabel: { interval: fc.key==='daily' ? Math.max(0,Math.floor(fc.dates.length/20)) : Math.max(0,Math.floor(fc.dates.length/12)), fontSize: 10, color: '#aaa', rotate: fc.key==='daily' ? 45 : 0 },
+            axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+          },
+          yAxis: {
+            type: 'value', name: '亿元',
+            axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
+            splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
+          },
+          dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
+          series
+        });
+      }, 50);
+    }
+  }
+
+  if (area.children.length === 0) {
+    area.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">未找到匹配数据，请调整筛选条件</div>';
+  }
+}
+
+window.addEventListener('resize', () => { chartInstances.forEach(c=>c.resize()); tsChartInstances.forEach(c=>c.resize()); });
+</script>
+</body>
+</html>
