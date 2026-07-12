@@ -1992,7 +1992,6 @@ function renderUlCharts() {
           axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
           splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
         },
-        animation: false,
         series
       });
     });
@@ -2205,7 +2204,6 @@ function renderUlTsByKey(tsKey, chartId, type) {
         splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
       },
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
-      animation: false,
       series
     });
   }
