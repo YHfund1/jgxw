@@ -430,9 +430,8 @@ fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
   data.ts_terms = data.ts_terms.filter(t => ulLongTerms.includes(t));
   data.terms = data.terms.filter(t => ulLongTerms.includes(t));
   initUlFilterPanels(data);
-  // Lazy init: only render when tab is first opened
-  window._ulChartsReady = false;
-  window._ulTsReady = false;
+  renderUlCharts();
+  renderUlTimeSeries();
 }).catch(err=>{
   console.warn('超长债数据加载失败:', err.message);
 });
@@ -445,8 +444,8 @@ function switchTab(tab, el) {
   if(tab==='charts') setTimeout(()=>chartInstances.forEach(c=>c.resize()),150);
   if(tab==='cumcharts') setTimeout(()=>cumChartInstances.forEach(c=>c.resize()),150);
   if(tab==='timeseries') setTimeout(()=>{ if(tsChartInstances.length) tsChartInstances.forEach(c=>c.resize()); },150);
-  if(tab==='ul-charts') { if(!window._ulChartsReady && ulAppData){ window._ulChartsReady=true; renderUlCharts(); } setTimeout(()=>ulChartInstances.forEach(c=>c.resize()),150); }
-  if(tab==='ul-timeseries') { if(!window._ulTsReady && ulAppData){ window._ulTsReady=true; renderUlTimeSeries(); } setTimeout(()=>{ if(ulTsChartInstances.length) ulTsChartInstances.forEach(c=>c.resize()); },150); }
+  if(tab==='ul-charts') setTimeout(()=>ulChartInstances.forEach(c=>c.resize()),150);
+  if(tab==='ul-timeseries') setTimeout(()=>{ if(ulTsChartInstances.length) ulTsChartInstances.forEach(c=>c.resize()); },150);
 }
 
 // === Dynamic table computation (SUMIFS equivalent) ===
@@ -1953,11 +1952,11 @@ function renderUlCharts() {
     card.innerHTML = `<div class="chart-header"><h3>${fullTitle}</h3></div><div class="chart-container" id="ulchart-${idx}"></div>`;
     grid.appendChild(card);
   });
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     chartsToShow.forEach((chart, idx) => {
       const el = document.getElementById('ulchart-' + idx);
       if (!el) return;
-      const inst = echarts.init(el);
+      const inst = echarts.init(el, null, { renderer: 'canvas' });
       ulChartInstances.push(inst);
       const series = [], legendData = [];
       chart.series.forEach(s => {
@@ -1993,10 +1992,11 @@ function renderUlCharts() {
           axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
           splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
         },
+        animation: false,
         series
       });
     });
-  }, 80);
+  });
 }
 
 // ===== 超长利率债：时间序列 =====
@@ -2109,7 +2109,7 @@ function renderUlTimeSeries() {
         '</div></div>' +
         '<div class="chart-container" id="' + chartId + '" style="height:420px;"></div>';
       area.appendChild(card);
-      setTimeout(() => { renderUlTsByKey(tsKey, chartId, curType); }, 50);
+      requestAnimationFrame(() => { renderUlTsByKey(tsKey, chartId, curType); });
     }
   }
   if (area.children.length === 0) {
@@ -2167,7 +2167,7 @@ function renderUlTsByKey(tsKey, chartId, type) {
     el.innerHTML = html;
   } else {
     el.style.height = '420px';
-    const inst = echarts.init(el);
+    const inst = echarts.init(el, null, { renderer: 'canvas' });
     ulTsChartInstances.push(inst);
     const { dates, instNames, data } = entry;
     const isBar = type === 'bar'; const use10DMA = !isBar && isDaily;
@@ -2205,6 +2205,7 @@ function renderUlTsByKey(tsKey, chartId, type) {
         splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }, axisLine: { show: false }
       },
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
+      animation: false,
       series
     });
   }
