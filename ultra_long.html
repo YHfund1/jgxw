@@ -227,7 +227,7 @@ const yearColors = {'2020':'#6c757d','2021':'#adb5bd','2022':'#74b9ff','2023':'#
 const yearWidths = {'2020':1.0,'2021':1.2,'2022':1.5,'2023':1.8,'2024':2,'2025':2.2,'2026':2.5};
 const instColors = ['#5b8ff9','#5ad8a6','#f6bd16','#6dc8ec','#9270ca','#ff9d4d','#e8684a','#789262'];
 
-// 债券区域合并映射：国债 = 国债-新债 + 国债-老债，政金债 = 政金债-新债 + 政金债-老债
+// 债券类型合并映射：国债 = 国债-新债 + 国债-老债，政金债 = 政金债-新债 + 政金债-老债
 const ulZoneMap = {
   '国债': ['国债-新债', '国债-老债'],
   '政金债': ['政金债-新债', '政金债-老债']
@@ -338,7 +338,7 @@ function initUlFilterPanels(data) {
 
   // Bond zone selector (table)
   const zoneEl = document.getElementById('ulBondZoneSelector');
-  zoneEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  zoneEl.innerHTML = '<span class="selector-label">债券类型：</span>';
   const allZoneBtn = document.createElement('button');
   allZoneBtn.className = 'filter-btn all-btn active';
   allZoneBtn.textContent = '全选';
@@ -368,7 +368,7 @@ function initUlFilterPanels(data) {
 
   // Chart: bond zone selector (single-select style, multi allowed)
   const cbEl = document.getElementById('ulChartBondSelector');
-  cbEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  cbEl.innerHTML = '<span class="selector-label">债券类型：</span>';
   ulAllBondOptions.forEach(z => {
     const btn = document.createElement('button');
     btn.className = 'filter-btn' + (ulChartBonds.includes(z)?' active':'');
@@ -443,7 +443,7 @@ function initUlFilterPanels(data) {
 
   // TS: bond selector
   const tsbEl = document.getElementById('ulTsBondSelector');
-  tsbEl.innerHTML = '<span class="selector-label">债券区域：</span>';
+  tsbEl.innerHTML = '<span class="selector-label">债券类型：</span>';
   ulAllBondOptions.forEach(z => {
     const btn = document.createElement('button');
     btn.className = 'filter-btn' + (ulTsBonds.includes(z)?' active':'');
@@ -597,27 +597,69 @@ function renderUlCharts() {
   const bondData = data.charts_by_bond[ulChartDataType];
   if (!bondData) return;
 
-  for (const zone of ulExpandZones(ulChartBonds)) {
-    const zoneData = bondData[zone];
-    if (!zoneData) continue;
-    for (const pos of ulChartPeriods) {
-      const posData = zoneData[pos];
-      if (!posData) continue;
-      for (const inst of ulChartInsts) {
-        const chart = posData[inst];
-        if (chart) chartsToShow.push(chart);
+  for (const bond of ulChartBonds) {
+    if (ulZoneMap[bond]) {
+      // 合并类型：将新债+老债数据加总为一张图
+      const subZones = ulZoneMap[bond];
+      for (const pos of ulChartPeriods) {
+        for (const inst of ulChartInsts) {
+          const subCharts = [];
+          for (const sz of subZones) {
+            const zData = bondData[sz];
+            if (zData && zData[pos] && zData[pos][inst]) subCharts.push(zData[pos][inst]);
+          }
+          if (subCharts.length > 0) {
+            if (subCharts.length === 1) {
+              const c = Object.assign({}, subCharts[0]);
+              c.bond_zone = bond;
+              chartsToShow.push(c);
+            } else {
+              // 按年份合并series数据
+              const mergedSeries = [];
+              const years = subCharts[0].series.map(s => s.name);
+              for (const year of years) {
+                const subSeries = subCharts.map(sc => sc.series.find(s => s.name === year)).filter(Boolean);
+                if (subSeries.length > 0) {
+                  const mergedData = subSeries[0].data.map((v, i) => {
+                    return subSeries.reduce((sum, s) => sum + (s.data[i] || 0), 0);
+                  });
+                  const mergedDma = subSeries[0].dma ? subSeries[0].dma.map((v, i) => {
+                    return subSeries.reduce((sum, s) => sum + (s.dma ? (s.dma[i] || 0) : 0), 0);
+                  }) : undefined;
+                  mergedSeries.push({ name: year, data: mergedData, dma: mergedDma });
+                }
+              }
+              chartsToShow.push({
+                bond_zone: bond, period: pos, institution: inst,
+                series: mergedSeries
+              });
+            }
+          }
+        }
+      }
+    } else {
+      // 普通类型：直接使用原始数据
+      const zoneData = bondData[bond];
+      if (!zoneData) continue;
+      for (const pos of ulChartPeriods) {
+        const posData = zoneData[pos];
+        if (!posData) continue;
+        for (const inst of ulChartInsts) {
+          const chart = posData[inst];
+          if (chart) chartsToShow.push(chart);
+        }
       }
     }
   }
 
   if (chartsToShow.length === 0) {
-    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#999;grid-column:1/-1;">请选择至少一个债券区域、机构和期限</div>';
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#999;grid-column:1/-1;">请选择至少一个债券类型、机构和期限</div>';
     document.getElementById('ulChartCount').textContent = '';
     return;
   }
 
   document.getElementById('ulChartCount').textContent =
-    `${ulExpandZones(ulChartBonds).length} 区域 × ${ulChartInsts.length} 机构 × ${ulChartPeriods.length} 期限 = ${chartsToShow.length} 张图表`;
+    `${ulChartBonds.length} 类型 × ${ulChartInsts.length} 机构 × ${ulChartPeriods.length} 期限 = ${chartsToShow.length} 张图表`;
 
   chartsToShow.forEach((chart, idx) => {
     const card = document.createElement('div');
