@@ -276,7 +276,7 @@ function summaryBg(val, maxAbs) {
 }
 
 // ===== Data Loading =====
-fetch('ultra_long_data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
+fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
   appData = data;
   ulSelectedZones = data.bond_zones.slice();
   ulChartBonds = [data.bond_zones[0]];

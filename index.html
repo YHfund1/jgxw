@@ -298,7 +298,7 @@ const _cumChartData = new Map();
 const _tsChartData = new Map();
 const _tsChartType = new Map(); // tsKey -> 'bar' | 'line' | 'table'
 
-fetch('data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
+fetch('data.json').then(r=>r.json()).then(data=>{
   appData = data;
   computeLiLvZhai(data);
   selectedBondTypes = [data.bond_types[0]]; // default: 国债
