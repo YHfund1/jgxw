@@ -175,7 +175,6 @@
     <!-- Tab 2: 机构净买入（季节性） -->
     <div id="section-charts" class="section">
       <div class="filter-panel" id="ulChartFilterPanel">
-        <div class="filter-row" id="ulChartDataTypeSelector"></div>
         <div class="filter-row" id="ulChartBondSelector"></div>
         <div class="filter-row" id="ulChartInstSelector"></div>
         <div class="filter-row" id="ulChartPeriodSelector"></div>
@@ -298,11 +297,11 @@ fetch('ultra_long_data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
 
 // ===== Filter Panel Init =====
 function initUlFilterPanels(data) {
-  // Data type selectors (3 places: table, chart, timeseries)
-  ['ulDataTypeSelector','ulChartDataTypeSelector','ulTsDataTypeSelector'].forEach((id, idx) => {
+  // Data type selectors (2 places: table, timeseries; charts section fixed to 净买入)
+  ['ulDataTypeSelector','ulTsDataTypeSelector'].forEach((id, idx) => {
     const el = document.getElementById(id);
     el.innerHTML = '<span class="selector-label">数据类型：</span>';
-    const defaultVal = ['净买入','净买入','净买入'][idx];
+    const defaultVal = ['净买入','净买入'][idx];
     data.data_types.forEach(dt => {
       const btn = document.createElement('button');
       btn.className = 'filter-btn' + (dt===defaultVal ? ' active' : '');
@@ -311,7 +310,6 @@ function initUlFilterPanels(data) {
         el.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
         if(id==='ulDataTypeSelector') { ulDataType=dt; applyUlDateRange(); }
-        else if(id==='ulChartDataTypeSelector') { ulChartDataType=dt; renderUlCharts(); }
         else { ulTsDataType=dt; renderUlTimeSeries(); }
       };
       el.appendChild(btn);
