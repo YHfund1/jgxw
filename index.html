@@ -1468,7 +1468,7 @@ function renderTimeSeries() {
         '<div class="chart-header-right">' +
         '<div class="chart-type-group" id="tsTypeGroup-' + tsKey + '">' +
         '<button class="chart-type-btn' + (curType==='bar'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'bar\')">柱状图</button>' +
-        '<button class="chart-type-btn' + (curType==='line'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'line\')">折线图</button>' +
+        '<button class="chart-type-btn' + (curType==='line'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'line\')">' + (fc.key==='daily'?'10DMA折线图':'折线图') + '</button>' +
         '<button class="chart-type-btn' + (curType==='table'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'table\')">表格</button>' +
         '</div>' +
         '<a class="download-btn" title="下载底稿" onclick="downloadTsByKey(\'' + tsKey + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>' +
@@ -1510,10 +1510,25 @@ function renderTsByKey(tsKey, chartId, type) {
   if (existing) { existing.dispose(); }
   el.innerHTML = '';
 
+  const isDaily = tsKey.includes('-daily');
+
   if (type === 'table') {
     el.style.height = 'auto';
     el.style.overflowX = 'auto';
     const { dates, instNames, data } = entry;
+    // Compute maxAbs for heat color
+    let maxAbs = 0;
+    dates.forEach(d => {
+      const row = data[d] || [];
+      let total = 0;
+      instNames.forEach((n, j) => {
+        const v = Math.round(row[j] || 0);
+        total += v;
+        if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+      });
+      if (Math.abs(total) > maxAbs) maxAbs = Math.abs(total);
+    });
+    if (maxAbs === 0) maxAbs = 1;
     let html = '<table class="ts-data-table"><thead><tr><th>日期</th>';
     instNames.forEach(n => html += '<th>' + n + '</th>');
     html += '<th>合计</th></tr></thead><tbody>';
@@ -1522,13 +1537,15 @@ function renderTsByKey(tsKey, chartId, type) {
       let total = 0;
       html += '<tr><td class="date-cell">' + d + '</td>';
       instNames.forEach((n, j) => {
-        const v = Math.round((row[j] || 0) * 100) / 100;
+        const v = Math.round(row[j] || 0);
         total += v;
-        const color = v > 0 ? '#52c41a' : (v < 0 ? '#ff4d4f' : '#999');
-        html += '<td style="color:' + color + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '</td>';
+        const bg = summaryBg(v, maxAbs);
+        const style = bg ? 'background:' + bg + ';color:#000;' : 'color:#000;';
+        html += '<td style="' + style + '">' + (v > 0 ? '+' : '') + v + '</td>';
       });
-      const tc = total > 0 ? '#52c41a' : (total < 0 ? '#ff4d4f' : '#999');
-      html += '<td style="font-weight:600;color:' + tc + '">' + (total > 0 ? '+' : '') + total.toFixed(2) + '</td></tr>';
+      const tbg = summaryBg(total, maxAbs);
+      const tstyle = tbg ? 'background:' + tbg + ';color:#000;font-weight:600;' : 'color:#000;font-weight:600;';
+      html += '<td style="' + tstyle + '">' + (total > 0 ? '+' : '') + total + '</td></tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
@@ -1538,13 +1555,24 @@ function renderTsByKey(tsKey, chartId, type) {
     tsChartInstances.push(inst);
     const { dates, instNames, data } = entry;
     const isBar = type === 'bar';
+    const use10DMA = !isBar && isDaily;
     const series = [];
     const legendData = [];
     instNames.forEach((instName, j) => {
-      const vals = dates.map(d => {
+      const rawVals = dates.map(d => {
         const row = data[d];
         return row ? Math.round((row[j] || 0) * 100) / 100 : 0;
       });
+      let vals;
+      if (use10DMA) {
+        vals = rawVals.map((v, i) => {
+          if (i < 9) return null;
+          const window = rawVals.slice(i - 9, i + 1);
+          return Math.round(window.reduce((a, b) => a + b, 0) / 10 * 100) / 100;
+        });
+      } else {
+        vals = rawVals;
+      }
       series.push({
         name: instName,
         type: isBar ? 'bar' : 'line',
@@ -1553,7 +1581,8 @@ function renderTsByKey(tsKey, chartId, type) {
         itemStyle: { color: instColors[j] },
         lineStyle: isBar ? undefined : { width: 1.5 },
         symbol: isBar ? undefined : 'none',
-        emphasis: { focus: 'series' }
+        emphasis: { focus: 'series' },
+        connectNulls: false
       });
       legendData.push(instName);
     });
@@ -1570,7 +1599,7 @@ function renderTsByKey(tsKey, chartId, type) {
               total += p.value;
             }
           });
-          h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
+          if (total !== 0) h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
           return h;
         }
       },
