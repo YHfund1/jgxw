@@ -156,6 +156,31 @@
       padding-left: 10px; border-left: 4px solid #1890ff;
     }
     .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .chart-header-right { display: flex; align-items: center; gap: 8px; }
+    .chart-type-group {
+      display: inline-flex; border-radius: 6px; overflow: hidden;
+      border: 1px solid #d9d9d9; font-size: 11px;
+    }
+    .chart-type-btn {
+      padding: 4px 10px; cursor: pointer;
+      background: #fff; color: #555; border: none; font-size: 11px;
+      transition: all 0.15s;
+    }
+    .chart-type-btn:not(:last-child) { border-right: 1px solid #d9d9d9; }
+    .chart-type-btn:hover { background: #f5f9ff; color: #1890ff; }
+    .chart-type-btn.active { background: #1890ff; color: #fff; }
+    .ts-data-table {
+      width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px;
+    }
+    .ts-data-table th {
+      background: #f8f9fa; padding: 8px 6px; text-align: center;
+      font-weight: 600; border: 1px solid #e8e8e8; color: #333; white-space: nowrap;
+    }
+    .ts-data-table td {
+      padding: 6px; text-align: center; border: 1px solid #f0f0f0; white-space: nowrap;
+    }
+    .ts-data-table tr:hover td { background: #f5f9ff; }
+    .ts-data-table td.date-cell { text-align: left; font-weight: 600; background: #fafbfc; }
     .chart-header h3 { margin-bottom: 0; }
     .chart-header h2 { margin-bottom: 0; }
     .download-btn {
@@ -271,6 +296,7 @@ let show10MMA = true;
 const _seasonalChartData = new Map();
 const _cumChartData = new Map();
 const _tsChartData = new Map();
+const _tsChartType = new Map(); // tsKey -> 'bar' | 'line' | 'table'
 
 fetch('data.json?v=' + Date.now()).then(r=>r.json()).then(data=>{
   appData = data;
@@ -1332,6 +1358,7 @@ function renderTimeSeries() {
   tsChartInstances.forEach(c => c.dispose());
   tsChartInstances = [];
   _tsChartData.clear();
+  _tsChartType.clear();
 
   const area = document.getElementById('tsChartsArea');
   area.innerHTML = '';
@@ -1436,81 +1463,140 @@ function renderTimeSeries() {
       const tsTitle = bondLabel + ' · ' + termLabel + ' · ' + fc.label;
       const tsKey = 'ts-' + term + '-' + fc.key;
       _tsChartData.set(tsKey, { title: tsTitle, dates: fc.dates, instNames: instNames, data: fc.data });
+      const curType = _tsChartType.get(tsKey) || 'bar';
       card.innerHTML = '<div class="chart-header"><h3>' + tsTitle + '</h3>' +
-        '<a class="download-btn" title="下载底稿" onclick="downloadTsByKey(\'' + tsKey + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a></div>' +
+        '<div class="chart-header-right">' +
+        '<div class="chart-type-group" id="tsTypeGroup-' + tsKey + '">' +
+        '<button class="chart-type-btn' + (curType==='bar'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'bar\')">柱状图</button>' +
+        '<button class="chart-type-btn' + (curType==='line'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'line\')">折线图</button>' +
+        '<button class="chart-type-btn' + (curType==='table'?' active':'') + '" onclick="switchTsType(\'' + tsKey + '\',\'' + chartId + '\',\'table\')">表格</button>' +
+        '</div>' +
+        '<a class="download-btn" title="下载底稿" onclick="downloadTsByKey(\'' + tsKey + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>' +
+        '</div></div>' +
         '<div class="chart-container" id="' + chartId + '" style="height:420px;"></div>';
       area.appendChild(card);
 
-      setTimeout(() => {
-        const el = document.getElementById(chartId);
-        if (!el) return;
-        const inst = echarts.init(el);
-        tsChartInstances.push(inst);
-
-        const series = [];
-        const legendData = [];
-        instNames.forEach((instName, j) => {
-          const vals = fc.dates.map(d => {
-            const row = fc.data[d];
-            return row ? Math.round((row[j] || 0) * 100) / 100 : 0;
-          });
-          series.push({
-            name: instName,
-            type: 'bar',
-            stack: 'total',
-            data: vals,
-            itemStyle: { color: instColors[j] },
-            emphasis: { focus: 'series' }
-          });
-          legendData.push(instName);
-        });
-
-        inst.setOption({
-          tooltip: {
-            trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
-            borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
-            formatter(params) {
-              let h = '<b style="color:#ddd">' + params[0].axisValue + '</b><br/>';
-              let total = 0;
-              params.forEach(p => {
-                if (p.value != null && p.value !== 0) {
-                  h += p.marker + ' ' + p.seriesName + ': <b>' + p.value.toFixed(2) + '</b> 亿<br/>';
-                  total += p.value;
-                }
-              });
-              h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
-              return h;
-            }
-          },
-          legend: {
-            data: legendData, top: 0,
-            textStyle: { fontSize: 11 }, itemWidth: 16, itemHeight: 10,
-            itemStyle: { borderWidth: 0 }, selectedMode: true
-          },
-          grid: { left: 60, right: 20, top: 40, bottom: 65 },
-          xAxis: {
-            type: 'category', data: fc.dates, boundaryGap: true,
-            axisLabel: {
-              interval: fc.key === 'daily' ? Math.max(0, Math.floor(fc.dates.length / 20)) : Math.max(0, Math.floor(fc.dates.length / 12)),
-              fontSize: 10, color: '#aaa', rotate: fc.key === 'daily' ? 45 : 0
-            },
-            axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
-          },
-          yAxis: {
-            type: 'value', name: '亿元',
-            axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
-            splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
-            axisLine: { show: false }
-          },
-          dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
-          series
-        });
-      }, 50);
+      setTimeout(() => { renderTsByKey(tsKey, chartId, curType); }, 50);
     }
   }
 
   if (area.children.length === 0) {
     area.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">未找到匹配数据，请调整筛选条件</div>';
+  }
+}
+
+// === 时间序列图表类型切换 ===
+function switchTsType(tsKey, chartId, type) {
+  _tsChartType.set(tsKey, type);
+  // Update button active state
+  const group = document.getElementById('tsTypeGroup-' + tsKey);
+  if (group) {
+    group.querySelectorAll('.chart-type-btn').forEach((btn, i) => {
+      const t = ['bar','line','table'][i];
+      btn.classList.toggle('active', t === type);
+    });
+  }
+  renderTsByKey(tsKey, chartId, type);
+}
+
+function renderTsByKey(tsKey, chartId, type) {
+  const entry = _tsChartData.get(tsKey);
+  if (!entry) return;
+  const el = document.getElementById(chartId);
+  if (!el) return;
+
+  // Dispose existing echarts instance
+  const existing = echarts.getInstanceByDom(el);
+  if (existing) { existing.dispose(); }
+  el.innerHTML = '';
+
+  if (type === 'table') {
+    el.style.height = 'auto';
+    el.style.overflowX = 'auto';
+    const { dates, instNames, data } = entry;
+    let html = '<table class="ts-data-table"><thead><tr><th>日期</th>';
+    instNames.forEach(n => html += '<th>' + n + '</th>');
+    html += '<th>合计</th></tr></thead><tbody>';
+    dates.forEach(d => {
+      const row = data[d] || [];
+      let total = 0;
+      html += '<tr><td class="date-cell">' + d + '</td>';
+      instNames.forEach((n, j) => {
+        const v = Math.round((row[j] || 0) * 100) / 100;
+        total += v;
+        const color = v > 0 ? '#52c41a' : (v < 0 ? '#ff4d4f' : '#999');
+        html += '<td style="color:' + color + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '</td>';
+      });
+      const tc = total > 0 ? '#52c41a' : (total < 0 ? '#ff4d4f' : '#999');
+      html += '<td style="font-weight:600;color:' + tc + '">' + (total > 0 ? '+' : '') + total.toFixed(2) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } else {
+    el.style.height = '420px';
+    const inst = echarts.init(el);
+    tsChartInstances.push(inst);
+    const { dates, instNames, data } = entry;
+    const isBar = type === 'bar';
+    const series = [];
+    const legendData = [];
+    instNames.forEach((instName, j) => {
+      const vals = dates.map(d => {
+        const row = data[d];
+        return row ? Math.round((row[j] || 0) * 100) / 100 : 0;
+      });
+      series.push({
+        name: instName,
+        type: isBar ? 'bar' : 'line',
+        stack: isBar ? 'total' : undefined,
+        data: vals,
+        itemStyle: { color: instColors[j] },
+        lineStyle: isBar ? undefined : { width: 1.5 },
+        symbol: isBar ? undefined : 'none',
+        emphasis: { focus: 'series' }
+      });
+      legendData.push(instName);
+    });
+    inst.setOption({
+      tooltip: {
+        trigger: 'axis', backgroundColor: 'rgba(30,30,50,0.92)',
+        borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 12 },
+        formatter(params) {
+          let h = '<b style="color:#ddd">' + params[0].axisValue + '</b><br/>';
+          let total = 0;
+          params.forEach(p => {
+            if (p.value != null && p.value !== 0) {
+              h += p.marker + ' ' + p.seriesName + ': <b>' + p.value.toFixed(2) + '</b> 亿<br/>';
+              total += p.value;
+            }
+          });
+          h += '<span style="color:#faad14">合计: <b>' + total.toFixed(2) + '</b> 亿</span>';
+          return h;
+        }
+      },
+      legend: {
+        data: legendData, top: 0,
+        textStyle: { fontSize: 11 }, itemWidth: 16, itemHeight: 10,
+        itemStyle: { borderWidth: 0 }, selectedMode: true
+      },
+      grid: { left: 60, right: 20, top: 40, bottom: 65 },
+      xAxis: {
+        type: 'category', data: dates, boundaryGap: isBar,
+        axisLabel: {
+          interval: Math.max(0, Math.floor(dates.length / 20)),
+          fontSize: 10, color: '#aaa', rotate: 45
+        },
+        axisLine: { lineStyle: { color: '#e0e0e0' } }, axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value', name: '亿元',
+        axisLabel: { fontSize: 10, color: '#aaa', formatter: v => v.toFixed(0) },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+        axisLine: { show: false }
+      },
+      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
+      series
+    });
   }
 }
 
