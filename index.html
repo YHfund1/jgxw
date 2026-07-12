@@ -1054,9 +1054,16 @@ function cumToggleFilter(type, value) {
 }
 
 function cumToggleAll(type) {
-  if (type === 'bond') cumSelectedBonds = appData.bond_types.slice();
-  else if (type === 'inst') cumSelectedInstitutions = appData.institutions.slice();
-  else cumSelectedTerms = appData.positions.slice();
+  if (type === 'bond') {
+    const allSelected = cumSelectedBonds.length === appData.bond_types.length;
+    cumSelectedBonds = allSelected ? [appData.bond_types[0]] : appData.bond_types.slice();
+  } else if (type === 'inst') {
+    const allSelected = cumSelectedInstitutions.length === appData.institutions.length;
+    cumSelectedInstitutions = allSelected ? [appData.institutions[0]] : appData.institutions.slice();
+  } else {
+    const allSelected = cumSelectedTerms.length === appData.positions.length;
+    cumSelectedTerms = allSelected ? [appData.positions[0]] : appData.positions.slice();
+  }
   cumUpdateFilterUI();
   renderCumCharts(appData);
 }
