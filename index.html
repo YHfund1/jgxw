@@ -225,8 +225,8 @@
     <div class="sidebar-item" data-tab="cumcharts" onclick="switchTab('cumcharts', this)">机构累计净买入（季节性）</div>
     <div class="sidebar-item" data-tab="timeseries" onclick="switchTab('timeseries', this)">时间序列</div>
     <div class="sidebar-divider">超长利率债分析</div>
-    <div class="sidebar-item sub-item" data-tab="ul-charts" onclick="switchTab('ul-charts', this)">机构净买入（季节性）</div>
-    <div class="sidebar-item sub-item" data-tab="ul-timeseries" onclick="switchTab('ul-timeseries', this)">时间序列</div>
+    <div class="sidebar-item sub-item" data-tab="ul-charts" onclick="switchTab('ul-charts', this)">超长债净买入（季节性）</div>
+    <div class="sidebar-item sub-item" data-tab="ul-timeseries" onclick="switchTab('ul-timeseries', this)">超长债时间序列</div>
   </div>
   <div class="content">
     <div id="section-table" class="section active">
@@ -1754,6 +1754,17 @@ function initUlFilterPanels(data) {
   // Chart: bond type selector
   const cbEl = document.getElementById('ulChartBondSelector');
   cbEl.innerHTML = '<span class="selector-label">债券类型：</span>';
+  const allBondBtn = document.createElement('button');
+  allBondBtn.className = 'filter-btn all-btn'; allBondBtn.textContent = '全选';
+  allBondBtn.onclick = () => {
+    ulChartBonds = ulChartBonds.length===ulAllBondOptions.length ? [ulAllBondOptions[0]] : ulAllBondOptions.slice();
+    cbEl.querySelectorAll('.filter-btn').forEach(b => {
+      if(b.textContent==='全选') b.classList.toggle('active', ulChartBonds.length===ulAllBondOptions.length);
+      else b.classList.toggle('active', ulChartBonds.includes(b.textContent));
+    });
+    renderUlCharts();
+  };
+  cbEl.appendChild(allBondBtn);
   ulAllBondOptions.forEach(z => {
     const btn = document.createElement('button');
     btn.className = 'filter-btn' + (ulChartBonds.includes(z)?' active':'');
@@ -1761,7 +1772,10 @@ function initUlFilterPanels(data) {
     btn.onclick = () => {
       if(ulChartBonds.includes(z)) { if(ulChartBonds.length>1) ulChartBonds=ulChartBonds.filter(x=>x!==z); }
       else ulChartBonds.push(z);
-      cbEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', ulChartBonds.includes(b.textContent)));
+      cbEl.querySelectorAll('.filter-btn').forEach(b => {
+        if(b.textContent==='全选') b.classList.toggle('active', ulChartBonds.length===ulAllBondOptions.length);
+        else b.classList.toggle('active', ulChartBonds.includes(b.textContent));
+      });
       renderUlCharts();
     };
     cbEl.appendChild(btn);
