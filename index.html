@@ -397,7 +397,6 @@ const ulZoneMap = {
   '政金债': ['政金债-新债', '政金债-老债']
 };
 const ulAllBondOptions = ['国债-新债','国债-老债','国债','政金债-新债','政金债-老债','政金债','地方政府债'];
-const ulLongTerms = ['总','10-15Y','15-20Y','20-30Y','30年以上'];
 function ulExpandZones(arr) {
   const result = [];
   for (const z of arr) {
@@ -425,10 +424,6 @@ fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
   document.getElementById('ulTsEndDate').max = data.all_dates[data.all_dates.length-1];
   document.getElementById('ulTsStartDate').addEventListener('change', renderUlTimeSeries);
   document.getElementById('ulTsEndDate').addEventListener('change', renderUlTimeSeries);
-  // Filter to ultra-long terms only
-  data.chart_positions = data.chart_positions.filter(p => ulLongTerms.includes(p));
-  data.ts_terms = data.ts_terms.filter(t => ulLongTerms.includes(t));
-  data.terms = data.terms.filter(t => ulLongTerms.includes(t));
   initUlFilterPanels(data);
   renderUlCharts();
   renderUlTimeSeries();
