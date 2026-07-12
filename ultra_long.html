@@ -236,8 +236,13 @@ const ulAllBondOptions = ['国债-新债','国债-老债','国债','政金债-�
 function ulExpandZones(arr) {
   const result = [];
   for (const z of arr) {
-    if (ulZoneMap[z]) for (const s of ulZoneMap[z]) if (!result.includes(s)) result.push(s);
-    else if (!result.includes(z)) result.push(z);
+    if (ulZoneMap[z]) {
+      for (const s of ulZoneMap[z]) {
+        if (!result.includes(s)) result.push(s);
+      }
+    } else {
+      if (!result.includes(z)) result.push(z);
+    }
   }
   return result;
 }
