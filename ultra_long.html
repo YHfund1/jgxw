@@ -621,10 +621,15 @@ function renderUlCharts() {
                 const subSeries = subCharts.map(sc => sc.series.find(s => s.name === year)).filter(Boolean);
                 if (subSeries.length > 0) {
                   const mergedData = subSeries[0].data.map((v, i) => {
-                    return subSeries.reduce((sum, s) => sum + (s.data[i] || 0), 0);
+                    // 如果所有子区域该位置都是null，则保留null
+                    const vals = subSeries.map(s => s.data[i]).filter(x => x !== null && x !== undefined);
+                    if (vals.length === 0) return null;
+                    return vals.reduce((sum, x) => sum + x, 0);
                   });
                   const mergedDma = subSeries[0].dma ? subSeries[0].dma.map((v, i) => {
-                    return subSeries.reduce((sum, s) => sum + (s.dma ? (s.dma[i] || 0) : 0), 0);
+                    const vals = subSeries.map(s => s.dma ? s.dma[i] : null).filter(x => x !== null && x !== undefined);
+                    if (vals.length === 0) return null;
+                    return vals.reduce((sum, x) => sum + x, 0);
                   }) : undefined;
                   mergedSeries.push({ name: year, data: mergedData, dma: mergedDma });
                 }
