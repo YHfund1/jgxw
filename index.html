@@ -385,6 +385,7 @@ let ulChartDataType = '净买入';
 let ulChartBonds = [];
 let ulChartInsts = [];
 let ulChartPeriods = ['10-15Y'];
+const _ulSeasonalChartData = new Map();
 let ulShow10MMA = true;
 let ulTsDataType = '净买入';
 let ulTsBonds = [];
@@ -1872,6 +1873,12 @@ function initUlFilterPanels(data) {
   });
 }
 
+function downloadUlSeasonalByKey(key) {
+  const entry = _ulSeasonalChartData.get(key);
+  if (!entry) return;
+  downloadSeasonalCSV(entry.title, ulAppData.x_axis_md, entry.series, ulShow10MMA);
+}
+
 // ===== 超长利率债：季节性图表 =====
 function ulCompute10MMA(data) {
   const result = [];
@@ -1961,7 +1968,9 @@ function renderUlCharts() {
     const periodLabel = chart.period === '总' ? '全部期限' : chart.period;
     const titleSuffix = ulShow10MMA ? ' · 10DMA' : '';
     const fullTitle = `${chart.bond_zone} · ${periodLabel} · ${chart.institution}${titleSuffix}`;
-    card.innerHTML = `<div class="chart-header"><h3>${fullTitle}</h3></div><div class="chart-container" id="ulchart-${idx}"></div>`;
+    const dlKey = `ulseasonal-${idx}`;
+    _ulSeasonalChartData.set(dlKey, { title: fullTitle, series: chart.series });
+    card.innerHTML = `<div class="chart-header"><h3>${fullTitle}</h3><a class="download-btn" title="下载底稿" onclick="downloadUlSeasonalByKey('${dlKey}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a></div><div class="chart-container" id="ulchart-${idx}"></div>`;
     grid.appendChild(card);
   });
   requestAnimationFrame(() => {
