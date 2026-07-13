@@ -384,11 +384,11 @@ const _ulTsChartType = new Map();
 let ulChartDataType = '净买入';
 let ulChartBonds = [];
 let ulChartInsts = [];
-let ulChartPeriods = ['总'];
+let ulChartPeriods = ['10-15Y'];
 let ulShow10MMA = true;
 let ulTsDataType = '净买入';
 let ulTsBonds = [];
-let ulTsTerms = ['总'];
+let ulTsTerms = ['10-15Y'];
 const ulYearColors = {'2020':'#6c757d','2021':'#adb5bd','2022':'#74b9ff','2023':'#2196F3','2024':'#1565C0','2025':'#0d47a1','2026':'#e74c3c'};
 const ulYearWidths = {'2020':1.0,'2021':1.2,'2022':1.5,'2023':1.8,'2024':2,'2025':2.2,'2026':2.5};
 const ulInstColors = ['#5b8ff9','#5ad8a6','#f6bd16','#6dc8ec','#9270ca','#ff9d4d','#e8684a','#789262'];
@@ -424,6 +424,9 @@ fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
   document.getElementById('ulTsEndDate').max = data.all_dates[data.all_dates.length-1];
   document.getElementById('ulTsStartDate').addEventListener('change', renderUlTimeSeries);
   document.getElementById('ulTsEndDate').addEventListener('change', renderUlTimeSeries);
+  // 超长债只展示10Y以上期限，过滤掉'总'
+  data.chart_positions = data.chart_positions.filter(p => p !== '总');
+  data.ts_terms = data.ts_terms.filter(t => t !== '总');
   initUlFilterPanels(data);
   renderUlCharts();
   renderUlTimeSeries();
@@ -1814,7 +1817,7 @@ function initUlFilterPanels(data) {
   const allPosBtn = document.createElement('button');
   allPosBtn.className = 'filter-btn all-btn'; allPosBtn.textContent = '全选';
   allPosBtn.onclick = () => {
-    ulChartPeriods = ulChartPeriods.length===data.chart_positions.length ? ['总'] : data.chart_positions.slice();
+    ulChartPeriods = ulChartPeriods.length===data.chart_positions.length ? [data.chart_positions[0]] : data.chart_positions.slice();
     cpEl.querySelectorAll('.filter-btn').forEach(b => {
       if(b.textContent==='全选') b.classList.toggle('active', ulChartPeriods.length===data.chart_positions.length);
       else b.classList.toggle('active', ulChartPeriods.includes(b.textContent));
