@@ -75,8 +75,8 @@ def find_latest_email(mail):
             # 检查本地是否已有包含该日期的文件
             existing = glob.glob(os.path.join(DOWNLOAD_DIR, f'*{date_suffix}*快照*.xlsx'))
             if existing:
-                print(f'  本地已有包含 {date_suffix} 的源文件，跳过下载')
-                return None, None
+                print(f'  本地已有包含 {date_suffix} 的源文件，跳过该邮件，继续查找更新的')
+                continue
 
         # 获取完整邮件
         status2, msg_data2 = mail.fetch(msg_id, '(RFC822)')
