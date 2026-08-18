@@ -227,6 +227,7 @@
     <div class="sidebar-divider">超长利率债分析</div>
     <div class="sidebar-item sub-item" data-tab="ul-charts" onclick="switchTab('ul-charts', this)">超长债净买入（季节性）</div>
     <div class="sidebar-item sub-item" data-tab="ul-timeseries" onclick="switchTab('ul-timeseries', this)">超长债时间序列</div>
+    <div class="sidebar-item sub-item" data-tab="ul-table" onclick="switchTab('ul-table', this)">超长债分期限统计表</div>
   </div>
   <div class="content">
     <div id="section-table" class="section active">
@@ -322,6 +323,36 @@
       </div>
       <div id="ulTsChartsArea" style="margin-top:20px;"></div>
     </div>
+    <!-- 超长利率债：分期限统计表 -->
+    <div id="section-ul-table" class="section">
+      <div class="date-range-bar">
+        <span class="date-label">起始时间：</span>
+        <input type="date" id="ulTableStartDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;">结束时间：</span>
+        <input type="date" id="ulTableEndDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyUlTableDateRange()">应用</button>
+        <span class="date-hint" id="ulTableDateHint"></span>
+      </div>
+      <div class="table-card">
+        <div class="chart-header">
+          <h2>超长债分期限统计表（净买入，亿元）</h2>
+        </div>
+        <div style="overflow-x:auto;"><table class="data-table" id="ulDataTable"></table></div>
+      </div>
+      <div class="date-range-bar" style="margin-top:16px;">
+        <span class="date-label" style="color:#fa8c16;">上期起始时间：</span>
+        <input type="date" id="ulTablePrevStartDate" class="date-input">
+        <span class="date-label" style="margin-left:16px;color:#fa8c16;">上期结束时间：</span>
+        <input type="date" id="ulTablePrevEndDate" class="date-input">
+        <button class="date-apply-btn" onclick="applyUlTableDateRange()" style="background:linear-gradient(135deg,#fa8c16,#d46b08);">应用</button>
+        <span class="date-hint" id="ulTablePrevDateHint"></span>
+      </div>
+      <div class="note">
+        <strong>说明：</strong>将【超长】拆分为【10-20Y】【20-30Y】【30年以上】三个子期限（10-20Y 由 10-15Y 与 15-20Y 加总），仅展示利率债（国债、政金债、地方债）。<br>
+        数据来源：短期（1Y以下~7-10Y）来自 data.json；超长拆分来自 ultra_long_data.json（国债/政金债合并新债+老债）。<br>
+        可查询区间统一从 2021 年开始（10Y 以上细分数据起点）。
+      </div>
+    </div>
   </div>
   </div>
 
@@ -371,6 +402,7 @@ fetch('data.json').then(r=>r.json()).then(data=>{
   renderCumCharts(data);
   initTimeSeriesPanel(data);
   renderTimeSeries();
+  initUlTable();
 }).catch(err=>{
   document.querySelector('.content').innerHTML = '<div style="text-align:center;padding:80px;color:#999;font-size:16px;">数据加载失败，请确保 data.json 文件存在<br><small>'+err.message+'</small></div>';
 });
@@ -431,6 +463,7 @@ fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
   initUlFilterPanels(data);
   renderUlCharts();
   renderUlTimeSeries();
+  initUlTable();
 }).catch(err=>{
   console.warn('超长债数据加载失败:', err.message);
 });
@@ -445,6 +478,7 @@ function switchTab(tab, el) {
   if(tab==='timeseries') setTimeout(()=>{ if(tsChartInstances.length) tsChartInstances.forEach(c=>c.resize()); },150);
   if(tab==='ul-charts') setTimeout(()=>ulChartInstances.forEach(c=>c.resize()),150);
   if(tab==='ul-timeseries') setTimeout(()=>{ if(ulTsChartInstances.length) ulTsChartInstances.forEach(c=>c.resize()); },150);
+  if(tab==='ul-table') setTimeout(()=>renderUlTable2(), 100);
 }
 
 // === Dynamic table computation (SUMIFS equivalent) ===
@@ -2251,6 +2285,190 @@ function downloadUlTsByKey(key) {
 }
 
 window.addEventListener('resize', () => { chartInstances.forEach(c => c.resize()); tsChartInstances.forEach(c => c.resize()); ulChartInstances.forEach(c => c.resize()); ulTsChartInstances.forEach(c => c.resize()); });
+
+// ===== 超长债分期限统计表 =====
+let ulTableReady = false;
+let ulTableMinDate = null;
+
+const ulTableSections = [
+  { title: '国债',   mainKey: '国债',   ulNewKey: '国债-新债', ulOldKey: '国债-老债' },
+  { title: '政金债', mainKey: '政金债', ulNewKey: '政金债-新债', ulOldKey: '政金债-老债' },
+  { title: '地方债', mainKey: '地方债', ulNewKey: '地方政府债', ulOldKey: null },
+];
+const ulTableInstHeaders = ['大型银行','中小型银行','证券公司','保险公司','基金公司及产品','理财类产品','货币基金','其他'];
+const ulTableShortTerms = ['1Y以下','1-3Y','3-5Y','5-7Y','7-10Y'];
+const ulTableUltraGroups = [
+  { label: '10-20Y',   sources: ['10-15Y','15-20Y'] },
+  { label: '20-30Y',   sources: ['20-30Y'] },
+  { label: '30年以上', sources: ['30年以上'] },
+];
+
+function ulTableSumMain(bondKey, termName, startDate, endDate) {
+  const raw = appData.raw_table[bondKey];
+  if (!raw) return new Array(8).fill(0);
+  const dates = raw.dates, values = raw.terms[termName];
+  if (!values) return new Array(8).fill(0);
+  const sum = new Array(8).fill(0);
+  for (let i = 0; i < dates.length; i++) {
+    if (dates[i] >= startDate && dates[i] <= endDate) {
+      for (let j = 0; j < 8; j++) sum[j] += (values[i][j] || 0);
+    }
+  }
+  return sum.map(v => Math.round(v * 100) / 100);
+}
+
+function ulTableSumUl(zoneKey, termName, startDate, endDate) {
+  const raw = ulAppData.raw_table['净买入'];
+  if (!raw) return new Array(8).fill(0);
+  const zone = raw[zoneKey];
+  if (!zone) return new Array(8).fill(0);
+  const dates = zone.dates, values = zone.terms[termName];
+  if (!values) return new Array(8).fill(0);
+  const sum = new Array(8).fill(0);
+  for (let i = 0; i < dates.length; i++) {
+    if (dates[i] >= startDate && dates[i] <= endDate) {
+      for (let j = 0; j < 8; j++) sum[j] += (values[i][j] || 0);
+    }
+  }
+  return sum.map(v => Math.round(v * 100) / 100);
+}
+
+function ulTableSumMerged(newKey, oldKey, termName, startDate, endDate) {
+  const a = ulTableSumUl(newKey, termName, startDate, endDate);
+  if (oldKey) {
+    const b = ulTableSumUl(oldKey, termName, startDate, endDate);
+    for (let i = 0; i < 8; i++) a[i] = Math.round((a[i] + b[i]) * 100) / 100;
+  }
+  return a;
+}
+
+function ulTableCompute(startDate, endDate, prevStart, prevEnd) {
+  const rows = [];
+  const grandCur = new Array(8).fill(0), grandPrev = new Array(8).fill(0);
+
+  for (const sec of ulTableSections) {
+    for (const term of ulTableShortTerms) {
+      const cur = ulTableSumMain(sec.mainKey, term, startDate, endDate);
+      const prev = ulTableSumMain(sec.mainKey, term, prevStart, prevEnd);
+      rows.push({ label: term, values: cur, prevValues: prev, isUltraRow: false, section: sec.title });
+      for (let j = 0; j < 8; j++) { grandCur[j] += cur[j]; grandPrev[j] += prev[j]; }
+    }
+    for (const group of ulTableUltraGroups) {
+      const cur = new Array(8).fill(0), prev = new Array(8).fill(0);
+      for (const srcTerm of group.sources) {
+        const c = ulTableSumMerged(sec.ulNewKey, sec.ulOldKey, srcTerm, startDate, endDate);
+        const p = ulTableSumMerged(sec.ulNewKey, sec.ulOldKey, srcTerm, prevStart, prevEnd);
+        for (let j = 0; j < 8; j++) { cur[j] = Math.round((cur[j] + c[j]) * 100) / 100; prev[j] = Math.round((prev[j] + p[j]) * 100) / 100; }
+      }
+      rows.push({ label: group.label, values: cur, prevValues: prev, isUltraRow: true, section: sec.title });
+      for (let j = 0; j < 8; j++) { grandCur[j] += cur[j]; grandPrev[j] += prev[j]; }
+    }
+  }
+
+  let maxAbs = 0;
+  for (const r of rows) {
+    for (let j = 0; j < 8; j++) {
+      maxAbs = Math.max(maxAbs, Math.abs(r.values[j]), Math.abs(r.prevValues[j] || 0));
+    }
+  }
+  maxAbs = Math.max(maxAbs, ...grandCur.map(Math.abs), ...grandPrev.map(Math.abs));
+  return { rows, grandCur, grandPrev, maxAbs };
+}
+
+function renderUlTable2() {
+  if (!ulTableReady) return;
+  const startDate = document.getElementById('ulTableStartDate').value;
+  const endDate = document.getElementById('ulTableEndDate').value;
+  const prevStart = document.getElementById('ulTablePrevStartDate').value;
+  const prevEnd = document.getElementById('ulTablePrevEndDate').value;
+  if (!startDate || !endDate || !prevStart || !prevEnd) return;
+
+  const result = ulTableCompute(startDate, endDate, prevStart, prevEnd);
+  const { rows, grandCur, grandPrev, maxAbs } = result;
+
+  let html = '<tbody>';
+  let currentSection = null;
+  for (const row of rows) {
+    if (row.section !== currentSection) {
+      currentSection = row.section;
+      html += `<tr class="section-row"><td class="sec-title">${currentSection}</td>`;
+      ulTableInstHeaders.forEach(h => html += `<td class="sec-inst">${h}</td>`);
+      html += '</tr>';
+    }
+    html += '<tr>';
+    html += `<td class="sub-cell">${row.label}</td>`;
+    for (let j = 0; j < 8; j++) {
+      const text = fmtText(row.values[j]);
+      const bg = summaryBg(row.values[j], maxAbs);
+      html += `<td style="${bg ? 'background:'+bg+';color:#000;' : 'color:#000;'}">${text}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  html += '<tr class="section-row"><td class="sec-title">汇总</td>';
+  ulTableInstHeaders.forEach(h => html += `<td class="sec-inst">${h}</td>`);
+  html += '</tr>';
+  html += `<tr class="summary-row"><td class="cat-cell">本期净买入（${startDate.replace(/-/g,'/')}-${endDate.replace(/-/g,'/')}）</td>`;
+  for (let j = 0; j < 8; j++) {
+    const v = Math.round(grandCur[j]*100)/100;
+    const bg = summaryBg(v, maxAbs);
+    html += `<td style="${bg ? 'background:'+bg+';color:#000;' : 'color:#000;'}">${fmtText(v)}</td>`;
+  }
+  html += '</tr>';
+  html += `<tr class="summary-row"><td class="cat-cell">上期净买入（${prevStart.replace(/-/g,'/')}-${prevEnd.replace(/-/g,'/')}）</td>`;
+  for (let j = 0; j < 8; j++) {
+    const v = Math.round(grandPrev[j]*100)/100;
+    const bg = summaryBg(v, maxAbs);
+    html += `<td style="${bg ? 'background:'+bg+';color:#000;' : 'color:#000;'}">${fmtText(v)}</td>`;
+  }
+  html += '</tr>';
+  html += '</tbody>';
+  document.getElementById('ulDataTable').innerHTML = html;
+}
+
+function applyUlTableDateRange() {
+  let startDate = document.getElementById('ulTableStartDate').value;
+  let endDate = document.getElementById('ulTableEndDate').value;
+  let prevStart = document.getElementById('ulTablePrevStartDate').value;
+  let prevEnd = document.getElementById('ulTablePrevEndDate').value;
+  if (!startDate || !endDate || !prevStart || !prevEnd) return;
+
+  if (ulTableMinDate) {
+    if (startDate < ulTableMinDate) { startDate = ulTableMinDate; document.getElementById('ulTableStartDate').value = startDate; }
+    if (endDate < ulTableMinDate) { endDate = ulTableMinDate; document.getElementById('ulTableEndDate').value = endDate; }
+    if (prevStart < ulTableMinDate) { prevStart = ulTableMinDate; document.getElementById('ulTablePrevStartDate').value = prevStart; }
+    if (prevEnd < ulTableMinDate) { prevEnd = ulTableMinDate; document.getElementById('ulTablePrevEndDate').value = prevEnd; }
+  }
+
+  if (startDate > endDate) { document.getElementById('ulTableDateHint').textContent = '⚠ 起始时间不能晚于结束时间'; return; }
+  if (prevStart > prevEnd) { document.getElementById('ulTablePrevDateHint').textContent = '⚠ 上期时间无效'; return; }
+  document.getElementById('ulTableDateHint').textContent = '';
+  document.getElementById('ulTablePrevDateHint').textContent = '';
+
+  renderUlTable2();
+}
+
+// 初始化超长债分期限统计表（在 ultra_long_data.json 加载完成后调用）
+function initUlTable() {
+  if (!appData || !ulAppData) return;
+  ulTableMinDate = ulAppData.all_dates[0];
+  const maxDate = appData.all_dates[appData.all_dates.length - 1];
+  const clamp = (v) => (v < ulTableMinDate ? ulTableMinDate : v);
+
+  document.getElementById('ulTableStartDate').value = clamp(appData.default_start);
+  document.getElementById('ulTableEndDate').value = appData.default_end;
+  document.getElementById('ulTableStartDate').min = ulTableMinDate;
+  document.getElementById('ulTableStartDate').max = maxDate;
+  document.getElementById('ulTableEndDate').min = ulTableMinDate;
+  document.getElementById('ulTableEndDate').max = maxDate;
+  document.getElementById('ulTablePrevStartDate').value = clamp(appData.default_start);
+  document.getElementById('ulTablePrevEndDate').value = appData.default_end;
+  document.getElementById('ulTablePrevStartDate').min = ulTableMinDate;
+  document.getElementById('ulTablePrevStartDate').max = maxDate;
+  document.getElementById('ulTablePrevEndDate').min = ulTableMinDate;
+  document.getElementById('ulTablePrevEndDate').max = maxDate;
+  ulTableReady = true;
+}
 </script>
 <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 </body>
