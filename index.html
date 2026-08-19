@@ -225,9 +225,9 @@
     <div class="sidebar-item" data-tab="cumcharts" onclick="switchTab('cumcharts', this)">机构累计净买入（季节性）</div>
     <div class="sidebar-item" data-tab="timeseries" onclick="switchTab('timeseries', this)">时间序列</div>
     <div class="sidebar-divider">超长利率债分析</div>
+    <div class="sidebar-item sub-item" data-tab="ul-table" onclick="switchTab('ul-table', this)">超长债分期限统计表</div>
     <div class="sidebar-item sub-item" data-tab="ul-charts" onclick="switchTab('ul-charts', this)">超长债净买入（季节性）</div>
     <div class="sidebar-item sub-item" data-tab="ul-timeseries" onclick="switchTab('ul-timeseries', this)">超长债时间序列</div>
-    <div class="sidebar-item sub-item" data-tab="ul-table" onclick="switchTab('ul-table', this)">超长债分期限统计表</div>
   </div>
   <div class="content">
     <div id="section-table" class="section active">
@@ -346,11 +346,6 @@
         <input type="date" id="ulTablePrevEndDate" class="date-input">
         <button class="date-apply-btn" onclick="applyUlTableDateRange()" style="background:linear-gradient(135deg,#fa8c16,#d46b08);">应用</button>
         <span class="date-hint" id="ulTablePrevDateHint"></span>
-      </div>
-      <div class="note">
-        <strong>说明：</strong>将【超长】拆分为【10-20Y】【20-30Y】【30年以上】三个子期限（10-20Y 由 10-15Y 与 15-20Y 加总），仅展示利率债（国债、政金债、地方债）。<br>
-        数据来源：短期（1Y以下~7-10Y）来自 data.json；超长拆分来自 ultra_long_data.json（国债/政金债合并新债+老债）。<br>
-        可查询区间统一从 2021 年开始（10Y 以上细分数据起点）。
       </div>
     </div>
   </div>
