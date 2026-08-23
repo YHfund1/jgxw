@@ -365,7 +365,7 @@ const _cumChartData = new Map();
 const _tsChartData = new Map();
 const _tsChartType = new Map(); // tsKey -> 'bar' | 'line' | 'table'
 
-fetch('data.json').then(r=>r.json()).then(data=>{
+fetch('data.json?v=202608212359').then(r=>r.json()).then(data=>{
   appData = data;
   computeLiLvZhai(data);
   selectedBondTypes = [data.bond_types[0]]; // default: 国债
@@ -439,7 +439,7 @@ function ulExpandZones(arr) {
   return result;
 }
 
-fetch('ultra_long_data.json').then(r=>r.json()).then(data=>{
+fetch('ultra_long_data.json?v=202608212359').then(r=>r.json()).then(data=>{
   ulAppData = data;
   ulChartBonds = [data.bond_zones[0]];
   ulChartInsts = data.institutions.slice();
