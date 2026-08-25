@@ -477,8 +477,8 @@ function switchTab(tab, el) {
 }
 
 // === Dynamic table computation (SUMIFS equivalent) ===
-// Table structure: 6 sections × (1 header + 6 term rows) + 2 summary rows = 50 rows
-// Sections: 国债(rows 0-6), 政金债(8-14), 地方债(16-22), 信用债(24-30), 二永债(32-38), 存单(40-46)
+// Table structure: 5 sections × (1 header + 6 term rows) + 2 summary rows = 42 rows
+// Sections: 国债(rows 0-6), 政金债(8-14), 地方债(16-22), 信用债(24-30), 二永债(32-38)
 // Data rows within each section: indices 1,2,3,4,5,6 → terms 1Y以下..超长
 const sectionDefs = [
   { name: '国债', dataRows: [1,2,3,4,5,6] },
@@ -486,7 +486,6 @@ const sectionDefs = [
   { name: '地方债', dataRows: [1,2,3,4,5,6] },
   { name: '信用债', dataRows: [1,2,3,4,5,6] },
   { name: '二永债', dataRows: [1,2,3,4,5,6] },
-  { name: '存单', dataRows: [1,2,3,4,5,6] },
 ];
 const tableTerms = ['1Y以下', '1-3Y', '3-5Y', '5-7Y', '7-10Y', '超长'];
 
@@ -512,12 +511,12 @@ function computeTable(data, startDate, endDate, prevStartDate, prevEndDate) {
   
   const grandTotalCur = [0,0,0,0,0,0,0,0];
   
-  const sectionStartRows = [0, 8, 16, 24, 32, 40];
+  const sectionStartRows = [0, 8, 16, 24, 32];
   
-  // Build 50 empty rows
-  for (let i = 0; i < 50; i++) table.push(new Array(10).fill(null));
+  // Build 42 empty rows
+  for (let i = 0; i < 42; i++) table.push(new Array(10).fill(null));
   
-  for (let s = 0; s < 6; s++) {
+  for (let s = 0; s < 5; s++) {
     const bondName = bondTypes[s];
     const rawBond = rawTable[bondName];
     if (!rawBond) continue;
@@ -629,7 +628,6 @@ function renderTable(table) {
     { title:'地方债', rows:[17,18,19,20,21,22], headerType:'inst2' },
     { title:'信用债', rows:[25,26,27,28,29,30], headerType:'inst2' },
     { title:'其他（二永为主）', rows:[33,34,35,36,37,38], headerType:'inst2' },
-    { title:'存单', rows:[41], headerType:'inst2' },
   ];
   const terms = ['1Y以下','1-3Y','3-5Y','5-7Y','7-10Y','超长'];
   const inst1Headers = ['大型银行','中小型银行','证券公司','保险公司','基金公司及产品','理财类产品','货币基金','其他'];
