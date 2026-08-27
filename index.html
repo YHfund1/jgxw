@@ -533,7 +533,7 @@ function computeTable(data, startDate, endDate, prevStartDate, prevEndDate) {
       dataRow[1] = termName;
       for (let j = 0; j < 8; j++) {
         dataRow[2 + j] = curSum[j];
-        grandTotalCur[j] += curSum[j];
+        if (bondName !== '存单') grandTotalCur[j] += curSum[j];
       }
     }
   }
@@ -555,6 +555,7 @@ function computePrevSummary(data, prevStart, prevEnd) {
   const bondTypes = data.table_bond_types;
   const total = [0,0,0,0,0,0,0,0];
   for (const bondName of bondTypes) {
+    if (bondName === '存单') continue;
     const rawBond = rawTable[bondName];
     if (!rawBond) continue;
     for (const termName of tableTerms) {
@@ -676,7 +677,7 @@ function renderTable(table) {
   }
 
   // Summary section
-  html += '<tr class="section-row"><td class="sec-title">汇总</td>';
+  html += '<tr class="section-row"><td class="sec-title">汇总（剔除存单）</td>';
   inst2Headers.forEach(h => html += `<td class="sec-inst">${h}</td>`);
   html += '</tr>';
   if (table.summaryData) {
